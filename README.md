@@ -77,7 +77,7 @@ Configuration is stored in JSON files under `data/` (gitignored). The main confi
 - `data/config.json`
 
 Key settings (editable in the admin panel):
-- Display: default view (Month/Upcoming), time format, theme colors, reset timer (minutes)
+- Display: default view (Month/Week/Upcoming), time format, theme colors, reset timer (minutes)
 - Calendars: enable/disable individual Google calendars
 - Refresh: calendar/weather refresh intervals
 - Google: sync window (days)
@@ -89,8 +89,10 @@ Other data files:
 
 ## Display Behavior
 - Month navigation uses the arrow buttons next to the month label.
-- The display auto-resets to the current day/month after the reset timer (minutes).
+- Week navigation uses the arrow buttons next to the date range.
+- The display auto-resets to the current day/week/month after the reset timer (minutes).
 - Upcoming shows events for the next 30 days and scrolls when long.
+- Weekly view shows expanded event cards within each day column.
 - Weather includes a 7-day forecast strip (simple badges).
 
 ## Time Sync

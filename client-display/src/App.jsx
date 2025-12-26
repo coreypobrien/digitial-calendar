@@ -14,6 +14,7 @@ const DAILY_WINDOW_START = 8;
 const DAILY_WINDOW_HOURS = 12;
 const DAILY_SLOT_MINUTES = 15;
 const DAILY_SLOT_HEIGHT = 24;
+const WEEK_EVENT_LIMIT = 6;
 const TIME_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const formatTime = (date, timeFormat) =>
@@ -33,6 +34,21 @@ const formatDate = (date) =>
 
 const formatMonthLabel = (date) =>
   date.toLocaleDateString([], { month: "long", year: "numeric" });
+
+const formatWeekLabel = (start, end) => {
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const startLabel = start.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" })
+  });
+  const endLabel = end.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+  return `${startLabel} - ${endLabel}`;
+};
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -60,6 +76,7 @@ const getForecastBadge = (description = "") => {
 
 const viewLabels = {
   month: "Monthly View",
+  week: "Weekly View",
   activity: "Upcoming"
 };
 
@@ -76,6 +93,22 @@ export default function App() {
   const [rangeRequest, setRangeRequest] = useState(null);
   const [timeOffsetMs, setTimeOffsetMs] = useState(0);
   const [activeEvent, setActiveEvent] = useState(null);
+  const handleViewChange = (nextView) => {
+    setView(nextView);
+    if (nextView === "month") {
+      const monthDiff =
+        (selectedDate.getFullYear() - now.getFullYear()) * 12 +
+        (selectedDate.getMonth() - now.getMonth());
+      setMonthOffset(monthDiff);
+    }
+  };
+  const shiftWeek = (direction) => {
+    setSelectedDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + direction * 7);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const updateNow = () => {
@@ -336,6 +369,25 @@ export default function App() {
     [now, monthOffset]
   );
 
+  const weekStartDate = useMemo(() => {
+    const start = new Date(selectedDate);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - start.getDay());
+    return start;
+  }, [selectedDate]);
+
+  const weekEndDate = useMemo(() => {
+    const end = new Date(weekStartDate);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }, [weekStartDate]);
+
+  const weekLabel = useMemo(
+    () => formatWeekLabel(weekStartDate, weekEndDate),
+    [weekStartDate, weekEndDate]
+  );
+
   const todayKey = useMemo(() => toLocalDateKey(now), [now]);
   const selectedKey = useMemo(() => toLocalDateKey(selectedDate), [selectedDate]);
   const selectedEvents = useMemo(
@@ -437,7 +489,7 @@ export default function App() {
   }, [activeMonthDate, selectedDate, view]);
 
   useEffect(() => {
-    if (view !== "month") {
+    if (view !== "month" && view !== "week") {
       return;
     }
     const rangeMax = eventsCache?.range?.timeMax;
@@ -448,15 +500,18 @@ export default function App() {
     if (Number.isNaN(rangeEnd.getTime())) {
       return;
     }
-    const targetEnd = new Date(
-      activeMonthDate.getFullYear(),
-      activeMonthDate.getMonth() + 1,
-      0,
-      23,
-      59,
-      59,
-      999
-    );
+    const targetEnd =
+      view === "month"
+        ? new Date(
+            activeMonthDate.getFullYear(),
+            activeMonthDate.getMonth() + 1,
+            0,
+            23,
+            59,
+            59,
+            999
+          )
+        : new Date(weekEndDate);
     if (targetEnd <= rangeEnd) {
       if (rangeRequest) {
         setRangeRequest(null);
@@ -488,7 +543,7 @@ export default function App() {
       }
     };
     extend();
-  }, [activeMonthDate, eventsCache?.range?.timeMax, rangeRequest, view]);
+  }, [activeMonthDate, eventsCache?.range?.timeMax, rangeRequest, view, weekEndDate]);
 
   const upcomingEvents = useMemo(() => {
     const nowMs = now.getTime();
@@ -535,6 +590,21 @@ export default function App() {
     }
     return cells;
   }, [activeMonthDate, sortedEvents]);
+
+  const panelLabel =
+    view === "month" ? formatMonthLabel(activeMonthDate) : view === "week" ? weekLabel : "Upcoming";
+
+  const weekCells = useMemo(() => {
+    const cells = [];
+    for (let i = 0; i < 7; i += 1) {
+      const date = new Date(weekStartDate);
+      date.setDate(weekStartDate.getDate() + i);
+      const key = toLocalDateKey(date);
+      const events = sortedEvents.filter((event) => eventOccursOnDateKey(event, key));
+      cells.push({ key, date, events });
+    }
+    return cells;
+  }, [sortedEvents, weekStartDate]);
 
   return (
     <main className="display">
@@ -595,9 +665,7 @@ export default function App() {
       <section className="display__content">
         <div className="display__panel">
           <div className="display__month-header">
-            <div className="display__month-label">
-              {view === "month" ? formatMonthLabel(activeMonthDate) : "Upcoming"}
-            </div>
+            <div className="display__month-label">{panelLabel}</div>
             {view === "month" ? (
               <div className="display__month-actions">
                 <button
@@ -617,6 +685,25 @@ export default function App() {
                   &gt;
                 </button>
               </div>
+            ) : view === "week" ? (
+              <div className="display__month-actions">
+                <button
+                  type="button"
+                  className="display__nav-button"
+                  onClick={() => shiftWeek(-1)}
+                  aria-label="Previous week"
+                >
+                  &lt;
+                </button>
+                <button
+                  type="button"
+                  className="display__nav-button"
+                  onClick={() => shiftWeek(1)}
+                  aria-label="Next week"
+                >
+                  &gt;
+                </button>
+              </div>
             ) : null}
             <div className="display__toggles">
               {Object.keys(viewLabels).map((key) => (
@@ -626,7 +713,7 @@ export default function App() {
                   className={
                     view === key ? "display__toggle display__toggle--active" : "display__toggle"
                   }
-                  onClick={() => setView(key)}
+                  onClick={() => handleViewChange(key)}
                 >
                   {viewLabels[key].replace(" View", "")}
                 </button>
@@ -691,6 +778,65 @@ export default function App() {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          ) : null}
+          {view === "week" ? (
+            <div className="display__week">
+              <div className="display__calendar-header">
+                {dayLabels.map((label) => (
+                  <div key={label} className="display__day-label">
+                    {label}
+                  </div>
+                ))}
+              </div>
+              <div className="display__week-grid">
+                {weekCells.map((cell) => {
+                  const isToday = cell.key === todayKey;
+                  const isSelected = cell.key === selectedKey;
+                  const events = cell.events || [];
+                  return (
+                    <div
+                      key={cell.key}
+                      className={
+                        isToday
+                          ? "display__day display__day--week display__day--today"
+                          : isSelected
+                            ? "display__day display__day--week display__day--selected"
+                            : "display__day display__day--week"
+                      }
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedDate(cell.date)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          setSelectedDate(cell.date);
+                        }
+                      }}
+                    >
+                      <div className="display__day-number">{cell.date.getDate()}</div>
+                      <div className="display__day-events">
+                        {events.slice(0, WEEK_EVENT_LIMIT).map((event) => (
+                          <div
+                            key={event.id}
+                            className="display__week-event"
+                            style={{ borderLeftColor: event.calendarColor }}
+                          >
+                            <span className="display__week-event-time">
+                              {formatEventRange(event, timeFormat)}
+                            </span>
+                            <span className="display__week-event-title">{event.summary}</span>
+                          </div>
+                        ))}
+                        {events.length > WEEK_EVENT_LIMIT ? (
+                          <div className="display__event-more">
+                            +{events.length - WEEK_EVENT_LIMIT} more
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : null}

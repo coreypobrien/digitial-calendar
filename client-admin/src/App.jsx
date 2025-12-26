@@ -342,7 +342,11 @@ export default function App() {
   }, [config, lastSavedConfig]);
 
   const displayDefaultValue =
-    config?.display?.defaultView === "activity" ? "activity" : "month";
+    config?.display?.defaultView === "activity"
+      ? "activity"
+      : config?.display?.defaultView === "week"
+        ? "week"
+        : "month";
 
   if (statusLoading) {
     return (
@@ -537,6 +541,7 @@ export default function App() {
                     }
                   >
                     <option value="month">Month</option>
+                    <option value="week">Week</option>
                     <option value="activity">Upcoming</option>
                   </select>
                 </label>

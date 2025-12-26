@@ -29,7 +29,11 @@ const mergeDeep = (base, override) => {
 
 const normalizeConfig = (config) => {
   const next = { ...config };
-  if (next.display?.defaultView !== "month" && next.display?.defaultView !== "activity") {
+  if (
+    next.display?.defaultView !== "month" &&
+    next.display?.defaultView !== "week" &&
+    next.display?.defaultView !== "activity"
+  ) {
     next.display = { ...next.display, defaultView: "month" };
   }
   if ("dailyResetMinutes" in next.display || "monthResetMinutes" in next.display) {
