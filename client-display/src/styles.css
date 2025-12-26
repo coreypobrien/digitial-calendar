@@ -58,22 +58,94 @@ body {
 
 .display__weather {
   font-size: 20px;
-  padding: 16px 24px;
-  border-radius: 999px;
+  padding: 14px 18px;
+  border-radius: 24px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
+  max-width: 520px;
+}
+
+.display__weather-main {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .display__weather strong {
-  font-size: 22px;
+  font-size: 26px;
 }
 
 .display__weather span {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 14px;
+}
+
+.display__forecast {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(31, 31, 31, 0.08);
+}
+
+.display__forecast-day {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.display__forecast-name {
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 9px;
+}
+
+.display__forecast-temps {
+  font-size: 10px;
+}
+
+.display__forecast-badge {
+  min-width: 30px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #1f1f1f;
+  background: rgba(31, 31, 31, 0.08);
+}
+
+.display__forecast-badge--sun {
+  background: rgba(251, 191, 36, 0.25);
+}
+
+.display__forecast-badge--cloud {
+  background: rgba(148, 163, 184, 0.3);
+}
+
+.display__forecast-badge--rain {
+  background: rgba(56, 189, 248, 0.25);
+}
+
+.display__forecast-badge--snow {
+  background: rgba(226, 232, 240, 0.8);
+}
+
+.display__forecast-badge--storm {
+  background: rgba(129, 140, 248, 0.3);
+}
+
+.display__forecast-badge--fog {
+  background: rgba(148, 163, 184, 0.2);
 }
 
 .display__content {

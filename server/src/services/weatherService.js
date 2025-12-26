@@ -36,6 +36,43 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
   const tempUnit = first.temperatureUnit || "F";
   const units = tempUnit === "F" ? "imperial" : "metric";
 
+  const dailyForecast = [];
+  const dailyIndex = new Map();
+  periods.forEach((period) => {
+    const dateKey = toLocalDateKey(period.startTime);
+    if (!dateKey) {
+      return;
+    }
+    let entry = dailyIndex.get(dateKey);
+    if (!entry) {
+      entry = {
+        date: dateKey,
+        min: period.temperature,
+        max: period.temperature,
+        description: period.shortForecast || "",
+        icon: period.icon || "",
+        _pickedDaytime: Boolean(period.isDaytime)
+      };
+      dailyIndex.set(dateKey, entry);
+      dailyForecast.push(entry);
+    } else if (typeof period.temperature === "number") {
+      if (entry.min === undefined || period.temperature < entry.min) {
+        entry.min = period.temperature;
+      }
+      if (entry.max === undefined || period.temperature > entry.max) {
+        entry.max = period.temperature;
+      }
+    }
+
+    if (period.isDaytime && !entry._pickedDaytime) {
+      entry.description = period.shortForecast || entry.description;
+      entry.icon = period.icon || entry.icon;
+      entry._pickedDaytime = true;
+    } else if (!entry.description && period.shortForecast) {
+      entry.description = period.shortForecast;
+    }
+  });
+
   const locationProps = pointsPayload?.properties?.relativeLocation?.properties;
   const locationName = locationProps?.city
     ? `${locationProps.city}${locationProps.state ? `, ${locationProps.state}` : ""}`
@@ -59,7 +96,8 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
     today: {
       min,
       max
-    }
+    },
+    forecast: dailyForecast.slice(0, 7).map(({ _pickedDaytime, ...rest }) => rest)
   };
 };
 

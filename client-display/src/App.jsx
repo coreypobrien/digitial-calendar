@@ -37,6 +37,26 @@ const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const getMinutesIntoDay = (date) => date.getHours() * 60 + date.getMinutes();
 
+const getForecastBadge = (description = "") => {
+  const text = description.toLowerCase();
+  if (text.includes("thunder") || text.includes("storm")) {
+    return { label: "STM", tone: "storm" };
+  }
+  if (text.includes("snow") || text.includes("sleet") || text.includes("flurr")) {
+    return { label: "SNW", tone: "snow" };
+  }
+  if (text.includes("rain") || text.includes("shower") || text.includes("drizzle")) {
+    return { label: "RN", tone: "rain" };
+  }
+  if (text.includes("fog") || text.includes("mist") || text.includes("haze")) {
+    return { label: "FG", tone: "fog" };
+  }
+  if (text.includes("cloud")) {
+    return { label: "CLD", tone: "cloud" };
+  }
+  return { label: "SUN", tone: "sun" };
+};
+
 const viewLabels = {
   month: "Monthly View",
   activity: "Upcoming"
@@ -392,16 +412,51 @@ export default function App() {
           {error ? <p className="display__subtle">{error}</p> : null}
         </div>
         <div className="display__weather">
-          {weatherSummary ? (
-            <>
-              <strong>{weatherSummary}</strong>
-              <span>
-                {weatherRange ? ` · ${weatherRange}` : ""} {weatherDescription}
-              </span>
-            </>
-          ) : (
-            <span>{weatherError || `${weatherLocationName} · ${weatherUnits}`}</span>
-          )}
+          <div className="display__weather-main">
+            {weatherSummary ? (
+              <>
+                <strong>{weatherSummary}</strong>
+                <span>
+                  {weatherRange ? ` · ${weatherRange}` : ""} {weatherDescription}
+                </span>
+              </>
+            ) : (
+              <span>{weatherError || `${weatherLocationName} · ${weatherUnits}`}</span>
+            )}
+          </div>
+          {weather?.forecast?.length ? (
+            <div className="display__forecast">
+              {weather.forecast.slice(0, 7).map((day) => {
+                const date = day.date ? new Date(`${day.date}T00:00:00`) : null;
+                const dayLabel =
+                  date && !Number.isNaN(date.getTime())
+                    ? date.toLocaleDateString([], { weekday: "short" })
+                    : "";
+                const high =
+                  day.max !== undefined && day.max !== null
+                    ? `${Math.round(day.max)}°`
+                    : "";
+                const low =
+                  day.min !== undefined && day.min !== null
+                    ? `${Math.round(day.min)}°`
+                    : "";
+                const temps = high && low ? `${high}/${low}` : high || low;
+                const badge = getForecastBadge(day.description);
+                return (
+                  <div key={day.date} className="display__forecast-day">
+                    <span className="display__forecast-name">{dayLabel}</span>
+                    <span
+                      className={`display__forecast-badge display__forecast-badge--${badge.tone}`}
+                      title={day.description || "Forecast"}
+                    >
+                      {badge.label}
+                    </span>
+                    <span className="display__forecast-temps">{temps}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </header>
       <section className="display__content">
