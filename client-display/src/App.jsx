@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+import {
+  eventOccursOnDateKey,
+  formatEventRange,
+  formatEventTime,
+  getEventEndMs,
+  getEventStartMs,
+  getUpcomingDateParts,
+  toLocalDateKey
+} from "./utils/events.js";
+
 const DAILY_WINDOW_START = 8;
 const DAILY_WINDOW_HOURS = 12;
 const DAILY_SLOT_MINUTES = 15;
@@ -25,102 +35,6 @@ const formatMonthLabel = (date) =>
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const toLocalDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const getEventDateKey = (event) => {
-  if (!event?.start) {
-    return null;
-  }
-  if (event.allDay && typeof event.start === "string") {
-    return event.start.slice(0, 10);
-  }
-  const start = new Date(event.start);
-  if (Number.isNaN(start.getTime())) {
-    return null;
-  }
-  return toLocalDateKey(start);
-};
-
-const eventOccursOnDateKey = (event, dateKey) => {
-  if (!event?.start || !dateKey) {
-    return false;
-  }
-  if (!event.allDay) {
-    return getEventDateKey(event) === dateKey;
-  }
-  const startKey = typeof event.start === "string" ? event.start.slice(0, 10) : null;
-  if (!startKey) {
-    return false;
-  }
-  if (!event.end || typeof event.end !== "string") {
-    return startKey === dateKey;
-  }
-  const endKey = event.end.slice(0, 10);
-  if (!endKey || endKey <= startKey) {
-    return startKey === dateKey;
-  }
-  return dateKey >= startKey && dateKey < endKey;
-};
-
-const getEventStartMs = (event) => {
-  if (!event?.start) {
-    return 0;
-  }
-  if (event.allDay && typeof event.start === "string") {
-    return new Date(`${event.start}T00:00:00`).getTime();
-  }
-  const start = new Date(event.start);
-  return Number.isNaN(start.getTime()) ? 0 : start.getTime();
-};
-
-const formatEventTime = (event, timeFormat) => {
-  if (event.allDay) {
-    return "All day";
-  }
-  const start = new Date(event.start);
-  if (Number.isNaN(start.getTime())) {
-    return "";
-  }
-  return start.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: timeFormat !== "24h"
-  });
-};
-
-const formatEventRange = (event, timeFormat) => {
-  if (event.allDay) {
-    return "All day";
-  }
-  const start = new Date(event.start);
-  const end = event.end ? new Date(event.end) : null;
-  if (Number.isNaN(start.getTime())) {
-    return "";
-  }
-  const options = { hour: "2-digit", minute: "2-digit", hour12: timeFormat !== "24h" };
-  const startLabel = start.toLocaleTimeString([], options);
-  if (!end || Number.isNaN(end.getTime())) {
-    return startLabel;
-  }
-  return `${startLabel} - ${end.toLocaleTimeString([], options)}`;
-};
-
-const getEventEndMs = (event) => {
-  if (!event?.end) {
-    return 0;
-  }
-  if (event.allDay && typeof event.end === "string") {
-    return new Date(`${event.end}T00:00:00`).getTime();
-  }
-  const end = new Date(event.end);
-  return Number.isNaN(end.getTime()) ? 0 : end.getTime();
-};
-
 const getMinutesIntoDay = (date) => date.getHours() * 60 + date.getMinutes();
 
 const viewLabels = {
@@ -137,6 +51,8 @@ export default function App() {
   const [eventsCache, setEventsCache] = useState({ events: [], updatedAt: null });
   const [view, setView] = useState("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [rangeRequest, setRangeRequest] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000 * 30);
@@ -247,6 +163,7 @@ export default function App() {
     ? config.display.defaultView
     : "month";
   const dailyResetMinutes = Number(config?.display?.dailyResetMinutes ?? 5);
+  const monthResetMinutes = Number(config?.display?.monthResetMinutes ?? 2);
   const weatherLocation = config?.weather?.location?.value || "Weather";
   const weatherUnitsRaw = weather?.units || config?.weather?.units || "imperial";
   const weatherUnits = weatherUnitsRaw === "metric" ? "C" : "F";
@@ -265,6 +182,11 @@ export default function App() {
     const events = eventsCache?.events || [];
     return [...events].sort((a, b) => getEventStartMs(a) - getEventStartMs(b));
   }, [eventsCache]);
+
+  const activeMonthDate = useMemo(
+    () => new Date(now.getFullYear(), now.getMonth() + monthOffset, 1),
+    [now, monthOffset]
+  );
 
   const todayKey = useMemo(() => toLocalDateKey(now), [now]);
   const selectedKey = useMemo(() => toLocalDateKey(selectedDate), [selectedDate]);
@@ -344,35 +266,104 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [dailyResetMinutes, selectedKey]);
 
+  useEffect(() => {
+    if (!monthResetMinutes || monthResetMinutes <= 0 || monthOffset === 0) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setMonthOffset(0);
+    }, monthResetMinutes * 60 * 1000);
+    return () => clearTimeout(timer);
+  }, [monthResetMinutes, monthOffset]);
+
+  useEffect(() => {
+    if (view !== "month") {
+      return;
+    }
+    const sameMonth =
+      selectedDate.getFullYear() === activeMonthDate.getFullYear() &&
+      selectedDate.getMonth() === activeMonthDate.getMonth();
+    if (!sameMonth) {
+      setSelectedDate(
+        new Date(activeMonthDate.getFullYear(), activeMonthDate.getMonth(), 1)
+      );
+    }
+  }, [activeMonthDate, selectedDate, view]);
+
+  useEffect(() => {
+    if (view !== "month") {
+      return;
+    }
+    const rangeMax = eventsCache?.range?.timeMax;
+    if (!rangeMax) {
+      return;
+    }
+    const rangeEnd = new Date(rangeMax);
+    if (Number.isNaN(rangeEnd.getTime())) {
+      return;
+    }
+    const targetEnd = new Date(
+      activeMonthDate.getFullYear(),
+      activeMonthDate.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+    if (targetEnd <= rangeEnd) {
+      if (rangeRequest) {
+        setRangeRequest(null);
+      }
+      return;
+    }
+    const targetIso = targetEnd.toISOString();
+    if (rangeRequest === targetIso) {
+      return;
+    }
+    setRangeRequest(targetIso);
+    const extend = async () => {
+      try {
+        const response = await fetch("/api/events/extend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ timeMax: targetIso })
+        });
+        if (!response.ok) {
+          return;
+        }
+        const eventsResponse = await fetch("/api/events");
+        const data = await eventsResponse.json();
+        if (eventsResponse.ok) {
+          setEventsCache(data);
+        }
+      } catch (_error) {
+        // Ignore extension failures; auto-sync will still refresh.
+      }
+    };
+    extend();
+  }, [activeMonthDate, eventsCache?.range?.timeMax, rangeRequest, view]);
+
   const upcomingEvents = useMemo(() => {
     const nowMs = now.getTime();
-    return sortedEvents.filter((event) => getEventStartMs(event) >= nowMs).slice(0, 6);
+    const windowEnd = nowMs + 30 * 24 * 60 * 60 * 1000;
+    return sortedEvents.filter((event) => {
+      const startMs = getEventStartMs(event);
+      return startMs >= nowMs && startMs <= windowEnd;
+    });
   }, [sortedEvents, now]);
 
-  const getUpcomingDateParts = (event) => {
-    if (!event?.start) {
-      return { weekday: "", day: "", month: "", timeLabel: "" };
-    }
-    let date = null;
-    if (event.allDay && typeof event.start === "string") {
-      date = new Date(`${event.start}T00:00:00`);
-    } else {
-      date = new Date(event.start);
-    }
-    if (!date || Number.isNaN(date.getTime())) {
-      return { weekday: "", day: "", month: "", timeLabel: "" };
-    }
-    return {
-      weekday: date.toLocaleDateString([], { weekday: "short" }),
-      day: date.toLocaleDateString([], { day: "numeric" }),
-      month: date.toLocaleDateString([], { month: "short" }),
-      timeLabel: event.allDay ? "All day" : formatEventTime(event, timeFormat)
-    };
-  };
-
   const monthCells = useMemo(() => {
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const monthStart = new Date(
+      activeMonthDate.getFullYear(),
+      activeMonthDate.getMonth(),
+      1
+    );
+    const monthEnd = new Date(
+      activeMonthDate.getFullYear(),
+      activeMonthDate.getMonth() + 1,
+      0
+    );
     const daysInMonth = monthEnd.getDate();
     const firstDay = monthStart.getDay();
     const cells = [];
@@ -380,13 +371,17 @@ export default function App() {
       cells.push({ key: `empty-${i}`, day: null });
     }
     for (let day = 1; day <= daysInMonth; day += 1) {
-      const date = new Date(now.getFullYear(), now.getMonth(), day);
+      const date = new Date(
+        activeMonthDate.getFullYear(),
+        activeMonthDate.getMonth(),
+        day
+      );
       const key = toLocalDateKey(date);
       const events = sortedEvents.filter((event) => eventOccursOnDateKey(event, key));
       cells.push({ key, day, date, events });
     }
     return cells;
-  }, [now, sortedEvents]);
+  }, [activeMonthDate, sortedEvents]);
 
   return (
     <main className="display">
@@ -413,8 +408,28 @@ export default function App() {
         <div className="display__panel">
           <div className="display__month-header">
             <div className="display__month-label">
-              {view === "month" ? formatMonthLabel(now) : "Upcoming"}
+              {view === "month" ? formatMonthLabel(activeMonthDate) : "Upcoming"}
             </div>
+            {view === "month" ? (
+              <div className="display__month-actions">
+                <button
+                  type="button"
+                  className="display__nav-button"
+                  onClick={() => setMonthOffset((prev) => prev - 1)}
+                  aria-label="Previous month"
+                >
+                  &lt;
+                </button>
+                <button
+                  type="button"
+                  className="display__nav-button"
+                  onClick={() => setMonthOffset((prev) => prev + 1)}
+                  aria-label="Next month"
+                >
+                  &gt;
+                </button>
+              </div>
+            ) : null}
             <div className="display__toggles">
               {Object.keys(viewLabels).map((key) => (
                 <button
@@ -495,7 +510,7 @@ export default function App() {
             <div className="display__list display__list--scrollable">
               {upcomingEvents.length ? (
                 upcomingEvents.map((event) => {
-                  const meta = getUpcomingDateParts(event);
+                  const meta = getUpcomingDateParts(event, timeFormat);
                   return (
                     <div
                       key={event.id}

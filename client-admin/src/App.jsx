@@ -453,6 +453,26 @@ export default function App() {
                   />
                 </label>
                 <label className="admin__field">
+                  Month view reset (minutes)
+                  <input
+                    type="number"
+                    min="0"
+                    value={config.display.monthResetMinutes ?? 0}
+                    onChange={(event) =>
+                      updateConfig((prev) => ({
+                        ...prev,
+                        display: {
+                          ...prev.display,
+                          monthResetMinutes: updateNumber(
+                            event.target.value,
+                            prev.display.monthResetMinutes
+                          )
+                        }
+                      }))
+                    }
+                  />
+                </label>
+                <label className="admin__field">
                   Background color
                   <input
                     type="color"

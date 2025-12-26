@@ -12,7 +12,8 @@ export const defaultConfig = {
       accent: "#2b6f6b",
       text: "#1f1f1f"
     },
-    dailyResetMinutes: 5
+    dailyResetMinutes: 5,
+    monthResetMinutes: 2
   },
   refresh: {
     calendarMinutes: 10,

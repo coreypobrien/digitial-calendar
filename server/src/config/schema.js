@@ -23,7 +23,8 @@ export const ConfigSchema = z.object({
     defaultView: z.enum(["month", "activity"]),
     timeFormat: z.enum(["12h", "24h"]),
     theme: ThemeSchema,
-    dailyResetMinutes: z.number().int().min(0).max(1440)
+    dailyResetMinutes: z.number().int().min(0).max(1440),
+    monthResetMinutes: z.number().int().min(0).max(1440)
   }),
   refresh: z.object({
     calendarMinutes: z.number().int().min(1),

@@ -52,7 +52,7 @@ describe("config routes", () => {
       ...current.body.config,
       display: {
         ...current.body.config.display,
-        defaultView: "day"
+        defaultView: "month"
       },
       refresh: {
         ...current.body.config.refresh,
@@ -62,7 +62,7 @@ describe("config routes", () => {
 
     const res = await agent.put("/api/settings").send(nextConfig);
     expect(res.status).toBe(200);
-    expect(res.body.config.display.defaultView).toBe("day");
+    expect(res.body.config.display.defaultView).toBe("month");
     expect(res.body.config.refresh.calendarMinutes).toBe(5);
   });
 
