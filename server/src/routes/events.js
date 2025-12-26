@@ -27,6 +27,13 @@ router.post("/extend", async (req, res, next) => {
       res.status(400).json({ error: "timeMax must be a valid ISO date" });
       return;
     }
+    const cache = await loadEventCache();
+    const cachedMax = cache?.range?.timeMax ? new Date(cache.range.timeMax) : null;
+    if (cachedMax && !Number.isNaN(cachedMax.getTime()) && target <= cachedMax) {
+      const { config } = await loadConfig();
+      res.json({ updated: false, syncDays: config.google.syncDays });
+      return;
+    }
     const now = new Date();
     if (target <= now) {
       const { config } = await loadConfig();

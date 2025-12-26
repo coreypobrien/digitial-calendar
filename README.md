@@ -6,6 +6,7 @@ A local-first calendar display for a Raspberry Pi touchscreen. It serves a full-
 - Node.js 20+
 - npm
 - Google Calendar API credentials (OAuth 2.0)
+- weather.gov is used for weather (no API key, U.S. only)
 
 ## Setup
 1. Install dependencies:
@@ -67,9 +68,34 @@ The server will serve the compiled display and admin apps from `/client-display/
    curl -b cookies.txt -X POST http://localhost:3000/api/google/sync
    ```
 
+Notes:
+- The admin panel lists individual calendars so you can enable/disable sources.
+- Month navigation can extend the sync window as you browse future months.
+
 ## Configuration Storage
 Configuration is stored in JSON files under `data/` (gitignored). The main config file is:
 - `data/config.json`
+
+Key settings (editable in the admin panel):
+- Display: default view (Month/Upcoming), time format, theme colors, reset timer (minutes)
+- Calendars: enable/disable individual Google calendars
+- Refresh: calendar/weather refresh intervals
+- Google: sync window (days)
+- Weather: units + location (coords via browser geolocation)
+
+Other data files:
+- `data/event_cache.json` (synced events + range window)
+- `data/weather_cache.json` (cached weather payload)
+
+## Display Behavior
+- Month navigation uses the arrow buttons next to the month label.
+- The display auto-resets to the current day/month after the reset timer (minutes).
+- Upcoming shows events for the next 30 days and scrolls when long.
+- Weather includes a 7-day forecast strip (simple badges).
+
+## Time Sync
+The display keeps time locally and requests `/api/time` every 24 hours to correct drift.
+Ensure the Raspberry Pi clock is synced with NTP for best accuracy.
 
 ## Weather Provider Notes
 - **weather.gov**: No API key required, U.S. only. Requires a `User-Agent` header with contact info.
@@ -111,4 +137,9 @@ WEATHER_GOV_USER_AGENT="wall-calendar (you@example.com)"
 ## Tests
 ```bash
 npm test
+```
+
+To run client tests:
+```bash
+npm --workspace client-display test
 ```

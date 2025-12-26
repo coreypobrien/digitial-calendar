@@ -402,7 +402,14 @@ export default function App() {
     const windowEnd = nowMs + 30 * 24 * 60 * 60 * 1000;
     return sortedEvents.filter((event) => {
       const startMs = getEventStartMs(event);
-      return startMs >= nowMs && startMs <= windowEnd;
+      const endMs = getEventEndMs(event);
+      if (startMs >= nowMs && startMs <= windowEnd) {
+        return true;
+      }
+      if (endMs && endMs > nowMs && startMs < nowMs) {
+        return true;
+      }
+      return false;
     });
   }, [sortedEvents, now]);
 

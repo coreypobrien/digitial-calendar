@@ -41,6 +41,28 @@ describe("configStore", () => {
     expect(config.display).toEqual(defaultConfig.display);
   });
 
+  it("migrates legacy reset fields into resetMinutes", async () => {
+    await fs.writeFile(
+      configPath,
+      JSON.stringify(
+        {
+          ...defaultConfig,
+          display: {
+            ...defaultConfig.display,
+            dailyResetMinutes: 12,
+            monthResetMinutes: 3
+          }
+        },
+        null,
+        2
+      )
+    );
+    const { config } = await configStore.loadConfig();
+    expect(config.display.resetMinutes).toBe(12);
+    expect("dailyResetMinutes" in config.display).toBe(false);
+    expect("monthResetMinutes" in config.display).toBe(false);
+  });
+
   it("saves valid config updates", async () => {
     const { config } = await configStore.ensureConfig();
     const nextConfig = {

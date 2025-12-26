@@ -32,19 +32,21 @@ const normalizeConfig = (config) => {
   if (next.display?.defaultView !== "month" && next.display?.defaultView !== "activity") {
     next.display = { ...next.display, defaultView: "month" };
   }
-  if (next.display?.resetMinutes === undefined) {
-    const fallback =
-      next.display?.dailyResetMinutes ??
-      next.display?.monthResetMinutes ??
-      defaultConfig.display.resetMinutes;
-    next.display = {
-      ...next.display,
-      resetMinutes: fallback
-    };
-  }
   if ("dailyResetMinutes" in next.display || "monthResetMinutes" in next.display) {
     const { dailyResetMinutes, monthResetMinutes, ...rest } = next.display;
-    next.display = rest;
+    next.display = {
+      ...rest,
+      resetMinutes:
+        dailyResetMinutes ??
+        monthResetMinutes ??
+        rest.resetMinutes ??
+        defaultConfig.display.resetMinutes
+    };
+  } else if (next.display?.resetMinutes === undefined) {
+    next.display = {
+      ...next.display,
+      resetMinutes: defaultConfig.display.resetMinutes
+    };
   }
   next.weather = {
     ...next.weather,
