@@ -11,6 +11,7 @@ import authRouter from "./routes/auth.js";
 import configRouter from "./routes/config.js";
 import eventsRouter from "./routes/events.js";
 import googleRouter from "./routes/google.js";
+import timeRouter from "./routes/time.js";
 import weatherRouter from "./routes/weather.js";
 
 export const createApp = () => {
@@ -45,6 +46,7 @@ export const createApp = () => {
   app.use("/api/settings", configRouter);
   app.use("/api/google", googleRouter);
   app.use("/api/events", eventsRouter);
+  app.use("/api/time", timeRouter);
   app.use("/api/weather", weatherRouter);
 
   const sendIfExists = (res, filePath) => {

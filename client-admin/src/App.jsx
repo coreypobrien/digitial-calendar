@@ -23,6 +23,9 @@ export default function App() {
   const [syncSummary, setSyncSummary] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [eventCache, setEventCache] = useState(null);
+  const [calendarList, setCalendarList] = useState([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState("");
   const [geoNotice, setGeoNotice] = useState("");
   const [geoError, setGeoError] = useState("");
   const [formValues, setFormValues] = useState({ username: "", password: "" });
@@ -72,6 +75,14 @@ export default function App() {
   }, [hasUser]);
 
   useEffect(() => {
+    if (googleStatus?.connected) {
+      refreshCalendars();
+    } else if (googleStatus && !googleStatus.connected) {
+      setCalendarList([]);
+    }
+  }, [googleStatus?.connected]);
+
+  useEffect(() => {
     if (!hasUser) {
       return;
     }
@@ -95,6 +106,22 @@ export default function App() {
     } else {
       setGoogleError(res.data.error || "Unable to load Google status.");
     }
+  };
+
+  const refreshCalendars = async () => {
+    setCalendarError("");
+    setCalendarLoading(true);
+    const res = await fetchJson("/api/google/calendars", { credentials: "include" });
+    setCalendarLoading(false);
+    if (!res.ok) {
+      if (res.status === 409) {
+        setCalendarError("Google account not connected.");
+      } else {
+        setCalendarError(res.data.error || "Unable to load calendars.");
+      }
+      return;
+    }
+    setCalendarList(res.data.calendars || []);
   };
 
   const refreshEventCache = async () => {
@@ -210,6 +237,59 @@ export default function App() {
       return fallback;
     }
     return parsed;
+  };
+
+  const calendarSelections = useMemo(() => {
+    if (!config || !calendarList.length) {
+      return [];
+    }
+    return calendarList.map((calendar) => {
+      const existing = config.calendars?.find((item) => item.id === calendar.id);
+      return {
+        id: calendar.id,
+        label: existing?.label || calendar.summary || calendar.id,
+        color:
+          existing?.color || calendar.backgroundColor || config.display?.theme?.accent || "#315a4a",
+        enabled: existing?.enabled ?? true
+      };
+    });
+  }, [calendarList, config]);
+
+  const toggleCalendar = (id, enabled) => {
+    if (!config) {
+      return;
+    }
+    updateConfig((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const list = prev.calendars || [];
+      const existingIndex = list.findIndex((item) => item.id === id);
+      const calendar = calendarList.find((item) => item.id === id);
+      const nextEntry = {
+        id,
+        label:
+          list[existingIndex]?.label ||
+          calendar?.summary ||
+          calendar?.id ||
+          id,
+        color:
+          list[existingIndex]?.color ||
+          calendar?.backgroundColor ||
+          prev.display?.theme?.accent ||
+          "#315a4a",
+        enabled
+      };
+      const nextList =
+        existingIndex >= 0
+          ? [
+              ...list.slice(0, existingIndex),
+              nextEntry,
+              ...list.slice(existingIndex + 1)
+            ]
+          : [...list, nextEntry];
+      return { ...prev, calendars: nextList };
+    });
   };
 
   const useBrowserLocation = () => {
@@ -400,6 +480,49 @@ export default function App() {
               </div>
             </div>
             <div className="admin__panel">
+              <div className="admin__panel-header">
+                <h3>Calendar Sources</h3>
+                <button
+                  type="button"
+                  className="admin__ghost"
+                  onClick={refreshCalendars}
+                  disabled={!googleStatus?.connected || calendarLoading}
+                >
+                  {calendarLoading ? "Refreshing…" : "Refresh list"}
+                </button>
+              </div>
+              <p className="admin__muted">
+                Enable or disable individual calendars to control what appears on the display.
+              </p>
+              {calendarError ? <div className="admin__alert">{calendarError}</div> : null}
+              {!googleStatus?.connected ? (
+                <p className="admin__muted">Connect Google to manage calendars.</p>
+              ) : calendarSelections.length ? (
+                <div className="admin__calendar-list">
+                  {calendarSelections.map((calendar) => (
+                    <label key={calendar.id} className="admin__calendar-item">
+                      <span className="admin__calendar-info">
+                        <span
+                          className="admin__calendar-color"
+                          style={{ backgroundColor: calendar.color }}
+                        />
+                        <span className="admin__calendar-name">{calendar.label}</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={calendar.enabled}
+                        onChange={(event) =>
+                          toggleCalendar(calendar.id, event.target.checked)
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="admin__muted">No calendars loaded yet.</p>
+              )}
+            </div>
+            <div className="admin__panel">
               <h3>Display Settings</h3>
               <div className="admin__grid">
                 <label className="admin__field">
@@ -433,39 +556,19 @@ export default function App() {
                   </select>
                 </label>
                 <label className="admin__field">
-                  Daily view reset (minutes)
+                  Reset timer (minutes)
                   <input
                     type="number"
                     min="0"
-                    value={config.display.dailyResetMinutes ?? 0}
+                    value={config.display.resetMinutes ?? 0}
                     onChange={(event) =>
                       updateConfig((prev) => ({
                         ...prev,
                         display: {
                           ...prev.display,
-                          dailyResetMinutes: updateNumber(
+                          resetMinutes: updateNumber(
                             event.target.value,
-                            prev.display.dailyResetMinutes
-                          )
-                        }
-                      }))
-                    }
-                  />
-                </label>
-                <label className="admin__field">
-                  Month view reset (minutes)
-                  <input
-                    type="number"
-                    min="0"
-                    value={config.display.monthResetMinutes ?? 0}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        display: {
-                          ...prev.display,
-                          monthResetMinutes: updateNumber(
-                            event.target.value,
-                            prev.display.monthResetMinutes
+                            prev.display.resetMinutes
                           )
                         }
                       }))

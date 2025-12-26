@@ -14,6 +14,7 @@ const DAILY_WINDOW_START = 8;
 const DAILY_WINDOW_HOURS = 12;
 const DAILY_SLOT_MINUTES = 15;
 const DAILY_SLOT_HEIGHT = 20;
+const TIME_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const formatTime = (date, timeFormat) =>
   date.toLocaleTimeString([], {
@@ -73,10 +74,43 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [monthOffset, setMonthOffset] = useState(0);
   const [rangeRequest, setRangeRequest] = useState(null);
+  const [timeOffsetMs, setTimeOffsetMs] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000 * 30);
+    const updateNow = () => {
+      setNow(new Date(Date.now() + timeOffsetMs));
+    };
+    updateNow();
+    const timer = setInterval(updateNow, 1000 * 30);
     return () => clearInterval(timer);
+  }, [timeOffsetMs]);
+
+  useEffect(() => {
+    let active = true;
+    const syncTime = async () => {
+      try {
+        const response = await fetch("/api/time");
+        const data = await response.json();
+        if (!active) {
+          return;
+        }
+        if (response.ok && data?.now) {
+          const serverNow = new Date(data.now).getTime();
+          if (!Number.isNaN(serverNow)) {
+            const nextOffset = serverNow - Date.now();
+            setTimeOffsetMs(nextOffset);
+          }
+        }
+      } catch (_error) {
+        // Ignore time sync failures; local clock keeps running.
+      }
+    };
+    syncTime();
+    const timer = setInterval(syncTime, TIME_SYNC_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -182,8 +216,7 @@ export default function App() {
   const defaultView = viewLabels[config?.display?.defaultView]
     ? config.display.defaultView
     : "month";
-  const dailyResetMinutes = Number(config?.display?.dailyResetMinutes ?? 5);
-  const monthResetMinutes = Number(config?.display?.monthResetMinutes ?? 2);
+  const resetMinutes = Number(config?.display?.resetMinutes ?? 5);
   const weatherLocation = config?.weather?.location?.value || "Weather";
   const weatherUnitsRaw = weather?.units || config?.weather?.units || "imperial";
   const weatherUnits = weatherUnitsRaw === "metric" ? "C" : "F";
@@ -272,7 +305,7 @@ export default function App() {
   }, [selectedEvents, timeFormat, dailyWindow]);
 
   useEffect(() => {
-    if (!dailyResetMinutes || dailyResetMinutes <= 0) {
+    if (!resetMinutes || resetMinutes <= 0) {
       return undefined;
     }
     const today = new Date();
@@ -282,19 +315,19 @@ export default function App() {
     }
     const timer = setTimeout(() => {
       setSelectedDate(new Date());
-    }, dailyResetMinutes * 60 * 1000);
+    }, resetMinutes * 60 * 1000);
     return () => clearTimeout(timer);
-  }, [dailyResetMinutes, selectedKey]);
+  }, [resetMinutes, selectedKey]);
 
   useEffect(() => {
-    if (!monthResetMinutes || monthResetMinutes <= 0 || monthOffset === 0) {
+    if (!resetMinutes || resetMinutes <= 0 || monthOffset === 0) {
       return undefined;
     }
     const timer = setTimeout(() => {
       setMonthOffset(0);
-    }, monthResetMinutes * 60 * 1000);
+    }, resetMinutes * 60 * 1000);
     return () => clearTimeout(timer);
-  }, [monthResetMinutes, monthOffset]);
+  }, [resetMinutes, monthOffset]);
 
   useEffect(() => {
     if (view !== "month") {
