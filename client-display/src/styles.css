@@ -1,0 +1,261 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap");
+
+:root {
+  color-scheme: light;
+  --bg-start: #f8f3ea;
+  --bg-end: #f1efe7;
+  --ink: #1f1f1f;
+  --muted: #5c5c5c;
+  --accent: #2b6f6b;
+  --panel: rgba(255, 255, 255, 0.8);
+  --panel-border: rgba(31, 31, 31, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
+}
+
+.display {
+  min-height: 100vh;
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.display__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 32px;
+}
+
+.display__date {
+  font-size: 28px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.display__time {
+  font-size: 64px;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.display__subtle {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.display__weather {
+  font-size: 20px;
+  padding: 16px 24px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.display__weather strong {
+  font-size: 22px;
+}
+
+.display__weather span {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.display__content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+.display__panel {
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  min-height: 280px;
+}
+
+.display__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.display__toggles {
+  display: flex;
+  gap: 8px;
+}
+
+.display__toggle {
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.display__toggle--active {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.display__month-label {
+  margin: 12px 0 16px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.display__calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.display__day-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.display__day {
+  min-height: 90px;
+  border-radius: 16px;
+  padding: 8px;
+  border: 1px solid rgba(31, 31, 31, 0.08);
+  background: rgba(255, 255, 255, 0.65);
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.display__day--empty {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.display__day--today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(43, 111, 107, 0.15);
+}
+
+.display__day--selected {
+  border-color: rgba(31, 31, 31, 0.2);
+  box-shadow: 0 0 0 2px rgba(31, 31, 31, 0.08);
+}
+
+.display__day-number {
+  font-weight: 600;
+}
+
+.display__event-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.display__event-chip-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.display__event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.display__event-more {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.display__list {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.display__section-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.display__event-row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.display__event-time {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.display__event-title {
+  font-size: 16px;
+}
+
+.display__muted {
+  color: var(--muted);
+  margin: 0;
+}
+
+.display__panel h2 {
+  margin-top: 0;
+  font-size: 28px;
+}
+
+.display__footer {
+  padding: 18px 24px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  font-size: 18px;
+}
+
+@media (max-width: 900px) {
+  .display {
+    padding: 28px;
+  }
+
+  .display__content {
+    grid-template-columns: 1fr;
+  }
+
+  .display__panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .display__event-row {
+    grid-template-columns: 1fr;
+  }
+
+  .display__time {
+    font-size: 48px;
+  }
+}

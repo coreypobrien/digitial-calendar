@@ -1,0 +1,16 @@
+{
+  "name": "wall-calendar",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client-display",
+    "client-admin"
+  ],
+  "scripts": {
+    "dev:server": "npm --workspace server run dev",
+    "dev:display": "npm --workspace client-display run dev",
+    "dev:admin": "npm --workspace client-admin run dev",
+    "build": "npm --workspace client-display run build && npm --workspace client-admin run build",
+    "test": "npm --workspace server run test"
+  }
+}
