@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import ChoreSettings from "./components/ChoreSettings.jsx";
+import ChoreHistory from "./components/ChoreHistory.jsx";
 
 const fetchJson = async (url, options) => {
   const response = await fetch(url, options);
@@ -29,6 +31,8 @@ export default function App() {
   const [geoNotice, setGeoNotice] = useState("");
   const [geoError, setGeoError] = useState("");
   const [formValues, setFormValues] = useState({ username: "", password: "" });
+  const [activeTab, setActiveTab] = useState("display");
+  const [choreData, setChoreData] = useState(null);
 
   const hasUser = Boolean(user);
 
@@ -42,6 +46,28 @@ export default function App() {
       setUser(null);
     } else {
       setConfigError(res.data.error || "Failed to load configuration.");
+    }
+  };
+
+  const loadChores = async () => {
+    const res = await fetchJson("/api/chores", { credentials: "include" });
+    if (res.ok) {
+      setChoreData(res.data);
+    }
+  };
+
+  const saveChores = async (newData) => {
+    const res = await fetchJson("/api/chores/config", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newData)
+    });
+    if (res.ok) {
+        setChoreData(res.data);
+        setSaveNotice("Chore settings saved.");
+    } else {
+        setSaveNotice(res.data.error || "Failed to save chores.");
     }
   };
 
@@ -71,6 +97,7 @@ export default function App() {
       loadConfig();
       refreshGoogleStatus();
       refreshEventCache();
+      loadChores();
     }
   }, [hasUser]);
 
@@ -403,10 +430,34 @@ export default function App() {
       <aside className="admin__sidebar">
         <h1>Wall Calendar Admin</h1>
         <nav>
-          <button type="button">Display</button>
-          <button type="button">Calendars</button>
-          <button type="button">Weather</button>
-          <button type="button">Notes</button>
+          <button 
+            type="button" 
+            className={activeTab === "display" ? "admin__nav--active" : ""}
+            onClick={() => setActiveTab("display")}
+          >
+            Display
+          </button>
+          <button 
+            type="button"
+            className={activeTab === "calendars" ? "admin__nav--active" : ""}
+            onClick={() => setActiveTab("calendars")}
+          >
+            Calendars
+          </button>
+          <button 
+            type="button"
+            className={activeTab === "weather" ? "admin__nav--active" : ""}
+            onClick={() => setActiveTab("weather")}
+          >
+            Weather
+          </button>
+          <button 
+            type="button"
+            className={activeTab === "chores" ? "admin__nav--active" : ""}
+            onClick={() => setActiveTab("chores")}
+          >
+            Chores
+          </button>
         </nav>
         <button className="admin__logout" type="button" onClick={handleLogout}>
           Log out
@@ -436,325 +487,369 @@ export default function App() {
         {configError ? <div className="admin__alert">{configError}</div> : null}
         {config ? (
           <>
-            <div className="admin__panel">
-              <h3>Google Calendar</h3>
-              <p className="admin__muted">
-                {googleStatus
-                  ? googleStatus.configured
-                    ? googleStatus.connected
-                      ? "Connected"
-                      : "Not connected"
-                    : "Google OAuth credentials missing."
-                  : "Checking connection..."}
-              </p>
-              <p className="admin__muted">
-                Last sync:{" "}
-                {eventCache?.updatedAt
-                  ? new Date(eventCache.updatedAt).toLocaleString()
-                  : "Not yet synced"}
-              </p>
-              {googleError ? <div className="admin__alert">{googleError}</div> : null}
-              {googleNotice ? <div className="admin__notice">{googleNotice}</div> : null}
-              {syncSummary ? (
-                <div className="admin__notice">
-                  Synced {syncSummary.events} events from {syncSummary.calendars} calendars.
-                </div>
-              ) : null}
-              <div className="admin__actions">
-                {googleStatus?.configured ? (
-                  googleStatus.connected ? (
-                    <>
-                      <button type="button" className="admin__primary" onClick={syncGoogle}>
-                        {syncing ? "Syncing…" : "Sync now"}
-                      </button>
-                      <button type="button" className="admin__ghost" onClick={disconnectGoogle}>
-                        Disconnect
-                      </button>
-                    </>
-                  ) : (
-                    <button type="button" className="admin__primary" onClick={connectGoogle}>
-                      Connect Google Calendar
-                    </button>
-                  )
-                ) : (
-                  <button type="button" className="admin__ghost" disabled>
-                    Add GOOGLE_CLIENT_ID/SECRET in .env
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="admin__panel">
-              <div className="admin__panel-header">
-                <h3>Calendar Sources</h3>
-                <button
-                  type="button"
-                  className="admin__ghost"
-                  onClick={refreshCalendars}
-                  disabled={!googleStatus?.connected || calendarLoading}
-                >
-                  {calendarLoading ? "Refreshing…" : "Refresh list"}
-                </button>
-              </div>
-              <p className="admin__muted">
-                Enable or disable individual calendars to control what appears on the display.
-              </p>
-              {calendarError ? <div className="admin__alert">{calendarError}</div> : null}
-              {!googleStatus?.connected ? (
-                <p className="admin__muted">Connect Google to manage calendars.</p>
-              ) : calendarSelections.length ? (
-                <div className="admin__calendar-list">
-                  {calendarSelections.map((calendar) => (
-                    <label key={calendar.id} className="admin__calendar-item">
-                      <span className="admin__calendar-info">
-                        <span
-                          className="admin__calendar-color"
-                          style={{ backgroundColor: calendar.color }}
-                        />
-                        <span className="admin__calendar-name">{calendar.label}</span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={calendar.enabled}
+            {activeTab === "display" && (
+              <>
+                <div className="admin__panel">
+                  <h3>Display Settings</h3>
+                  <div className="admin__grid">
+                    <label className="admin__field">
+                      Default view
+                      <select
+                        value={displayDefaultValue}
                         onChange={(event) =>
-                          toggleCalendar(calendar.id, event.target.checked)
+                          updateConfig((prev) => ({
+                            ...prev,
+                            display: { ...prev.display, defaultView: event.target.value }
+                          }))
+                        }
+                      >
+                        <option value="month">Month</option>
+                        <option value="week">Week</option>
+                        <option value="activity">Upcoming</option>
+                        <option value="chores">Chores</option>
+                      </select>
+                    </label>
+                    <label className="admin__field">
+                      Time format
+                      <select
+                        value={config.display.timeFormat}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            display: { ...prev.display, timeFormat: event.target.value }
+                          }))
+                        }
+                      >
+                        <option value="12h">12 hour</option>
+                        <option value="24h">24 hour</option>
+                      </select>
+                    </label>
+                    <label className="admin__field">
+                      Reset timer (minutes)
+                      <input
+                        type="number"
+                        min="0"
+                        value={config.display.resetMinutes ?? 0}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            display: {
+                              ...prev.display,
+                              resetMinutes: updateNumber(
+                                event.target.value,
+                                prev.display.resetMinutes
+                              )
+                            }
+                          }))
                         }
                       />
                     </label>
-                  ))}
+                    <label className="admin__field">
+                      Background color
+                      <input
+                        type="color"
+                        value={config.display.theme.background}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            display: {
+                              ...prev.display,
+                              theme: { ...prev.display.theme, background: event.target.value }
+                            }
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="admin__field">
+                      Accent color
+                      <input
+                        type="color"
+                        value={config.display.theme.accent}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            display: {
+                              ...prev.display,
+                              theme: { ...prev.display.theme, accent: event.target.value }
+                            }
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="admin__field">
+                      Text color
+                      <input
+                        type="color"
+                        value={config.display.theme.text}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            display: {
+                              ...prev.display,
+                              theme: { ...prev.display.theme, text: event.target.value }
+                            }
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
                 </div>
-              ) : (
-                <p className="admin__muted">No calendars loaded yet.</p>
-              )}
-            </div>
-            <div className="admin__panel">
-              <h3>Display Settings</h3>
-              <div className="admin__grid">
-                <label className="admin__field">
-                  Default view
-                  <select
-                    value={displayDefaultValue}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        display: { ...prev.display, defaultView: event.target.value }
-                      }))
-                    }
-                  >
-                    <option value="month">Month</option>
-                    <option value="week">Week</option>
-                    <option value="activity">Upcoming</option>
-                  </select>
-                </label>
-                <label className="admin__field">
-                  Time format
-                  <select
-                    value={config.display.timeFormat}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        display: { ...prev.display, timeFormat: event.target.value }
-                      }))
-                    }
-                  >
-                    <option value="12h">12 hour</option>
-                    <option value="24h">24 hour</option>
-                  </select>
-                </label>
-                <label className="admin__field">
-                  Reset timer (minutes)
-                  <input
-                    type="number"
-                    min="0"
-                    value={config.display.resetMinutes ?? 0}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        display: {
-                          ...prev.display,
-                          resetMinutes: updateNumber(
-                            event.target.value,
-                            prev.display.resetMinutes
-                          )
+                <div className="admin__panel">
+                  <h3>Refresh Intervals</h3>
+                  <div className="admin__grid">
+                    <label className="admin__field">
+                      Calendar refresh (minutes)
+                      <input
+                        type="number"
+                        min="1"
+                        value={config.refresh.calendarMinutes}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            refresh: {
+                              ...prev.refresh,
+                              calendarMinutes: updateNumber(
+                                event.target.value,
+                                prev.refresh.calendarMinutes
+                              )
+                            }
+                          }))
                         }
-                      }))
-                    }
-                  />
-                </label>
-                <label className="admin__field">
-                  Background color
-                  <input
-                    type="color"
-                    value={config.display.theme.background}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        display: {
-                          ...prev.display,
-                          theme: { ...prev.display.theme, background: event.target.value }
+                      />
+                    </label>
+                    <label className="admin__field">
+                      Weather refresh (minutes)
+                      <input
+                        type="number"
+                        min="1"
+                        value={config.refresh.weatherMinutes}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            refresh: {
+                              ...prev.refresh,
+                              weatherMinutes: updateNumber(
+                                event.target.value,
+                                prev.refresh.weatherMinutes
+                              )
+                            }
+                          }))
                         }
-                      }))
-                    }
-                  />
-                </label>
-                <label className="admin__field">
-                  Accent color
-                  <input
-                    type="color"
-                    value={config.display.theme.accent}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        display: {
-                          ...prev.display,
-                          theme: { ...prev.display.theme, accent: event.target.value }
-                        }
-                      }))
-                    }
-                  />
-                </label>
-                <label className="admin__field">
-                  Text color
-                  <input
-                    type="color"
-                    value={config.display.theme.text}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        display: {
-                          ...prev.display,
-                          theme: { ...prev.display.theme, text: event.target.value }
-                        }
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="admin__panel">
-              <h3>Refresh Intervals</h3>
-              <div className="admin__grid">
-                <label className="admin__field">
-                  Calendar refresh (minutes)
-                  <input
-                    type="number"
-                    min="1"
-                    value={config.refresh.calendarMinutes}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        refresh: {
-                          ...prev.refresh,
-                          calendarMinutes: updateNumber(
-                            event.target.value,
-                            prev.refresh.calendarMinutes
-                          )
-                        }
-                      }))
-                    }
-                  />
-                </label>
-                <label className="admin__field">
-                  Weather refresh (minutes)
-                  <input
-                    type="number"
-                    min="1"
-                    value={config.refresh.weatherMinutes}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        refresh: {
-                          ...prev.refresh,
-                          weatherMinutes: updateNumber(
-                            event.target.value,
-                            prev.refresh.weatherMinutes
-                          )
-                        }
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="admin__panel">
-              <h3>Weather Settings</h3>
-              {geoError ? <div className="admin__alert">{geoError}</div> : null}
-              {geoNotice ? <div className="admin__notice">{geoNotice}</div> : null}
-              <p className="admin__muted">
-                weather.gov requires coordinates and only supports U.S. locations.
-              </p>
-              <div className="admin__grid">
-                <label className="admin__field">
-                  Units
-                  <select
-                    value={config.weather.units}
-                    onChange={(event) =>
-                      updateConfig((prev) => ({
-                        ...prev,
-                        weather: { ...prev.weather, units: event.target.value }
-                      }))
-                    }
-                    disabled
-                  >
-                    <option value="imperial">Imperial</option>
-                    <option value="metric">Metric</option>
-                  </select>
-                </label>
-                <div className="admin__field admin__field--button">
-                  <span>Use browser location</span>
-                  <button type="button" className="admin__ghost" onClick={useBrowserLocation}>
-                    Use my location
-                  </button>
+                      />
+                    </label>
+                  </div>
                 </div>
-                <label className="admin__field">
-                  Latitude
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={config.weather.location.lat ?? ""}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      updateConfig((prev) => {
-                        const nextLocation = { ...prev.weather.location };
-                        if (value === "") {
-                          delete nextLocation.lat;
-                        } else {
-                          nextLocation.lat = Number(value);
-                        }
-                        return {
+              </>
+            )}
+
+            {activeTab === "calendars" && (
+              <>
+                <div className="admin__panel">
+                  <h3>Google Calendar</h3>
+                  <p className="admin__muted">
+                    {googleStatus
+                      ? googleStatus.configured
+                        ? googleStatus.connected
+                          ? "Connected"
+                          : "Not connected"
+                        : "Google OAuth credentials missing."
+                      : "Checking connection..."}
+                  </p>
+                  <p className="admin__muted">
+                    Last sync:{" "}
+                    {eventCache?.updatedAt
+                      ? new Date(eventCache.updatedAt).toLocaleString()
+                      : "Not yet synced"}
+                  </p>
+                  {googleError ? <div className="admin__alert">{googleError}</div> : null}
+                  {googleNotice ? (
+                    <div className="admin__notice">{googleNotice}</div>
+                  ) : null}
+                  {syncSummary ? (
+                    <div className="admin__notice">
+                      Synced {syncSummary.events} events from {syncSummary.calendars}{" "}
+                      calendars.
+                    </div>
+                  ) : null}
+                  <div className="admin__actions">
+                    {googleStatus?.configured ? (
+                      googleStatus.connected ? (
+                        <>
+                          <button
+                            type="button"
+                            className="admin__primary"
+                            onClick={syncGoogle}
+                          >
+                            {syncing ? "Syncing…" : "Sync now"}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin__ghost"
+                            onClick={disconnectGoogle}
+                          >
+                            Disconnect
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="admin__primary"
+                          onClick={connectGoogle}
+                        >
+                          Connect Google Calendar
+                        </button>
+                      )
+                    ) : (
+                      <button type="button" className="admin__ghost" disabled>
+                        Add GOOGLE_CLIENT_ID/SECRET in .env
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="admin__panel">
+                  <div className="admin__panel-header">
+                    <h3>Calendar Sources</h3>
+                    <button
+                      type="button"
+                      className="admin__ghost"
+                      onClick={refreshCalendars}
+                      disabled={!googleStatus?.connected || calendarLoading}
+                    >
+                      {calendarLoading ? "Refreshing…" : "Refresh list"}
+                    </button>
+                  </div>
+                  <p className="admin__muted">
+                    Enable or disable individual calendars to control what appears on the
+                    display.
+                  </p>
+                  {calendarError ? (
+                    <div className="admin__alert">{calendarError}</div>
+                  ) : null}
+                  {!googleStatus?.connected ? (
+                    <p className="admin__muted">Connect Google to manage calendars.</p>
+                  ) : calendarSelections.length ? (
+                    <div className="admin__calendar-list">
+                      {calendarSelections.map((calendar) => (
+                        <label key={calendar.id} className="admin__calendar-item">
+                          <span className="admin__calendar-info">
+                            <span
+                              className="admin__calendar-color"
+                              style={{ backgroundColor: calendar.color }}
+                            />
+                            <span className="admin__calendar-name">
+                              {calendar.label}
+                            </span>
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={calendar.enabled}
+                            onChange={(event) =>
+                              toggleCalendar(calendar.id, event.target.checked)
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="admin__muted">No calendars loaded yet.</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {activeTab === "weather" && (
+              <div className="admin__panel">
+                <h3>Weather Settings</h3>
+                {geoError ? <div className="admin__alert">{geoError}</div> : null}
+                {geoNotice ? <div className="admin__notice">{geoNotice}</div> : null}
+                <p className="admin__muted">
+                  weather.gov requires coordinates and only supports U.S. locations.
+                </p>
+                <div className="admin__grid">
+                  <label className="admin__field">
+                    Units
+                    <select
+                      value={config.weather.units}
+                      onChange={(event) =>
+                        updateConfig((prev) => ({
                           ...prev,
-                          weather: { ...prev.weather, location: nextLocation }
-                        };
-                      });
-                    }}
-                    disabled={config.weather.location.type !== "coords"}
-                  />
-                </label>
-                <label className="admin__field">
-                  Longitude
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={config.weather.location.lon ?? ""}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      updateConfig((prev) => {
-                        const nextLocation = { ...prev.weather.location };
-                        if (value === "") {
-                          delete nextLocation.lon;
-                        } else {
-                          nextLocation.lon = Number(value);
-                        }
-                        return {
-                          ...prev,
-                          weather: { ...prev.weather, location: nextLocation }
-                        };
-                      });
-                    }}
-                    disabled={config.weather.location.type !== "coords"}
-                  />
-                </label>
+                          weather: { ...prev.weather, units: event.target.value }
+                        }))
+                      }
+                      disabled
+                    >
+                      <option value="imperial">Imperial</option>
+                      <option value="metric">Metric</option>
+                    </select>
+                  </label>
+                  <div className="admin__field admin__field--button">
+                    <span>Use browser location</span>
+                    <button
+                      type="button"
+                      className="admin__ghost"
+                      onClick={useBrowserLocation}
+                    >
+                      Use my location
+                    </button>
+                  </div>
+                  <label className="admin__field">
+                    Latitude
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={config.weather.location.lat ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        updateConfig((prev) => {
+                          const nextLocation = { ...prev.weather.location };
+                          if (value === "") {
+                            delete nextLocation.lat;
+                          } else {
+                            nextLocation.lat = Number(value);
+                          }
+                          return {
+                            ...prev,
+                            weather: { ...prev.weather, location: nextLocation }
+                          };
+                        });
+                      }}
+                      disabled={config.weather.location.type !== "coords"}
+                    />
+                  </label>
+                  <label className="admin__field">
+                    Longitude
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={config.weather.location.lon ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        updateConfig((prev) => {
+                          const nextLocation = { ...prev.weather.location };
+                          if (value === "") {
+                            delete nextLocation.lon;
+                          } else {
+                            nextLocation.lon = Number(value);
+                          }
+                          return {
+                            ...prev,
+                            weather: { ...prev.weather, location: nextLocation }
+                          };
+                        });
+                      }}
+                      disabled={config.weather.location.type !== "coords"}
+                    />
+                  </label>
+                </div>
               </div>
-            </div>
+            )}
+
+            {activeTab === "chores" && (
+              <>
+                <ChoreSettings data={choreData} onSave={saveChores} />
+                <ChoreHistory />
+              </>
+            )}
           </>
         ) : (
           <div className="admin__panel">Loading configuration…</div>

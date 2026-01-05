@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import ChoreView from "./components/ChoreView.jsx";
 
 import {
   eventOccursOnDateKey,
@@ -77,7 +78,8 @@ const getForecastBadge = (description = "") => {
 const viewLabels = {
   month: "Monthly View",
   week: "Weekly View",
-  activity: "Upcoming"
+  activity: "Upcoming",
+  chores: "Chores"
 };
 
 export default function App() {
@@ -662,7 +664,7 @@ export default function App() {
           ) : null}
         </div>
       </header>
-      <section className="display__content">
+      <section className={`display__content ${view === "chores" ? "display__content--chores" : ""}`}>
         <div className="display__panel">
           <div className="display__month-header">
             <div className="display__month-label">{panelLabel}</div>
@@ -882,6 +884,7 @@ export default function App() {
               )}
             </div>
           ) : null}
+          {view === "chores" ? <ChoreView /> : null}
         </div>
         <div className="display__panel">
           <h2>{formatDate(selectedDate)}</h2>

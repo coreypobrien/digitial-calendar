@@ -1,6 +1,7 @@
 import { createApp } from "./app.js";
 import { createLogger } from "./logger.js";
 import { startCalendarSyncJob } from "./jobs/calendarSync.js";
+import { startChoreResetJob } from "./jobs/choreReset.js";
 
 const app = createApp();
 const logger = createLogger();
@@ -11,3 +12,4 @@ app.listen(port, () => {
 });
 
 void startCalendarSyncJob(logger);
+void startChoreResetJob(logger);

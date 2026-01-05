@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import App from "./App.jsx";
 
@@ -108,12 +108,21 @@ describe("App event details modal", () => {
 
     render(<App />);
 
-    const eventButton = await screen.findByRole("button", { name: /Team Sync/i });
-    fireEvent.click(eventButton);
+    const eventButtons = await screen.findAllByRole("button", { name: /Team Sync/i });
+    // The calendar cell (month view) is also a button containing the text. 
+    // We want the event pill in the side panel (Daily View) which opens the modal.
+    // The calendar cell usually contains the day number, while the event pill does not.
+    const eventPill = eventButtons.find(b => !b.querySelector(".display__day-number"));
+    
+    if (!eventPill) {
+      throw new Error("Could not find the event pill button in the daily view");
+    }
+    
+    fireEvent.click(eventPill);
 
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toBeInTheDocument();
-    expect(screen.getByText("Team Sync")).toBeInTheDocument();
+    expect(within(dialog).getByText("Team Sync")).toBeInTheDocument();
     expect(screen.getByText("Conference Room")).toBeInTheDocument();
     expect(screen.getByText("Discuss project status.")).toBeInTheDocument();
 

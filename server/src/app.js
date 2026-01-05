@@ -8,6 +8,7 @@ import pinoHttp from "pino-http";
 import { createLogger } from "./logger.js";
 import { rootDir } from "./paths.js";
 import authRouter from "./routes/auth.js";
+import choresRouter from "./routes/chores.js";
 import configRouter from "./routes/config.js";
 import eventsRouter from "./routes/events.js";
 import googleRouter from "./routes/google.js";
@@ -43,6 +44,7 @@ export const createApp = () => {
   });
 
   app.use("/api/auth", authRouter);
+  app.use("/api/chores", choresRouter);
   app.use("/api/settings", configRouter);
   app.use("/api/google", googleRouter);
   app.use("/api/events", eventsRouter);

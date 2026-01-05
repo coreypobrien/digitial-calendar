@@ -136,6 +136,32 @@ WEATHER_GOV_USER_AGENT="wall-calendar (you@example.com)"
    chromium-browser --kiosk http://localhost:3000
    ```
 
+## Kiosk Mode Autostart (Recommended for Pi)
+1. Install Chromium (if needed):
+   ```bash
+   sudo apt update
+   sudo apt install -y chromium-browser
+   ```
+2. Create an autostart entry:
+   ```bash
+   mkdir -p ~/.config/autostart
+   ```
+   Create `~/.config/autostart/wall-calendar.desktop`:
+   ```ini
+   [Desktop Entry]
+   Type=Application
+   Name=Wall Calendar Kiosk
+   Exec=chromium-browser --kiosk --incognito --disable-translate --noerrdialogs --disable-infobars --disable-session-crashed-bubble http://localhost:3000
+   ```
+3. (Optional) Hide the mouse cursor:
+   ```bash
+   sudo apt install -y unclutter
+   ```
+   Add another autostart entry or run:
+   ```bash
+   unclutter -idle 0.5 -root
+   ```
+
 ## Tests
 ```bash
 npm test

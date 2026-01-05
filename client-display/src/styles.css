@@ -157,6 +157,14 @@ body {
   min-height: 0;
 }
 
+.display__content--chores {
+  grid-template-columns: 1fr;
+}
+
+.display__content--chores .display__panel:last-child {
+  display: none;
+}
+
 .display__panel {
   padding: 24px;
   border-radius: 24px;
@@ -677,4 +685,106 @@ body {
   .display__time {
     font-size: 48px;
   }
+}
+
+/* Chore Chart Styles */
+.chore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 24px;
+  height: 100%;
+}
+
+.chore-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 24px;
+  padding: 16px;
+  border: 1px solid rgba(31, 31, 31, 0.08);
+}
+
+.chore-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(31, 31, 31, 0.08);
+}
+
+.chore-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.chore-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.chore-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.chore-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(31, 31, 31, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.chore-item:active {
+  transform: scale(0.98);
+}
+
+.chore-check {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 2px solid var(--muted);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.chore-label {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.chore-item--done .chore-check {
+  background: currentColor; /* Will inherit from inline style color */
+  border-color: transparent;
+}
+
+.chore-item--done .chore-label {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.chore-progress {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
 }

@@ -84,6 +84,12 @@ button {
   font-size: 15px;
 }
 
+.admin__nav--active {
+  background: var(--accent) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
 .admin__ghost {
   background: #f9f7f3;
   border: 1px solid var(--panel-border);
