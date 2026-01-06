@@ -13,6 +13,12 @@ export const CalendarSourceSchema = z.object({
   enabled: z.boolean()
 });
 
+export const IcalFeedSchema = z.object({
+  url: z.string().url(),
+  label: z.string(),
+  enabled: z.boolean()
+});
+
 export const ConfigSchema = z.object({
   version: z.number().int(),
   admin: z.object({
@@ -30,6 +36,9 @@ export const ConfigSchema = z.object({
     weatherMinutes: z.number().int().min(1)
   }),
   calendars: z.array(CalendarSourceSchema),
+  ical: z.object({
+    feeds: z.array(IcalFeedSchema)
+  }),
   google: z.object({
     syncDays: z.number().int().min(1).max(365)
   }),

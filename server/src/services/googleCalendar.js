@@ -1,7 +1,5 @@
 import { google } from "googleapis";
 
-import { loadConfig } from "../storage/configStore.js";
-import { saveEventCache } from "../storage/eventStore.js";
 import { getAuthorizedClient } from "./googleAuth.js";
 
 const DEFAULT_COLOR = "#2b6f6b";
@@ -68,26 +66,21 @@ export const listCalendars = async () => {
   return response.data.items || [];
 };
 
-export const syncCalendarEvents = async () => {
+export const syncGoogleEvents = async ({ config, timeMin, timeMax, requireGoogle } = {}) => {
   const client = await getAuthorizedClient();
   if (!client) {
-    const error = new Error("Google account not connected");
-    error.code = "NOT_CONNECTED";
-    throw error;
+    if (requireGoogle) {
+      const error = new Error("Google account not connected");
+      error.code = "NOT_CONNECTED";
+      throw error;
+    }
+    return { connected: false, calendars: 0, events: [] };
   }
 
   const calendarApi = google.calendar({ version: "v3", auth: client });
   const calendarList = await calendarApi.calendarList.list({ minAccessRole: "reader" });
   const items = calendarList.data.items || [];
-  const { config } = await loadConfig();
-
   const targets = buildCalendarTargets(config, items);
-  const now = new Date();
-  const timeMin = now.toISOString();
-  const timeMax = new Date(
-    now.getTime() + config.google.syncDays * 24 * 60 * 60 * 1000
-  ).toISOString();
-
   const events = [];
 
   for (const calendar of targets) {
@@ -114,17 +107,5 @@ export const syncCalendarEvents = async () => {
     } while (pageToken);
   }
 
-  const payload = {
-    updatedAt: new Date().toISOString(),
-    range: { timeMin, timeMax },
-    events
-  };
-
-  await saveEventCache(payload);
-
-  return {
-    updatedAt: payload.updatedAt,
-    events: events.length,
-    calendars: targets.length
-  };
+  return { connected: true, calendars: targets.length, events };
 };

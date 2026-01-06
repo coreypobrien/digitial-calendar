@@ -17,6 +17,14 @@ import weatherRouter from "./routes/weather.js";
 
 export const createApp = () => {
   dotenv.config({ path: path.join(rootDir, ".env") });
+  Object.keys(process.env).forEach((key) => {
+    const value = process.env[key];
+    if (typeof value !== "string") {
+      return;
+    }
+    // Strip wrapping quotes because docker keeps them while .env parsing does not.
+    process.env[key] = value.replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
+  });
 
   const logger = createLogger();
   const app = express();

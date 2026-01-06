@@ -59,4 +59,22 @@ describe("ConfigSchema", () => {
     const result = ConfigSchema.safeParse(badConfig);
     expect(result.success).toBe(false);
   });
+
+  it("rejects invalid iCal feed URLs", () => {
+    const badConfig = {
+      ...defaultConfig,
+      ical: {
+        feeds: [
+          {
+            url: "not-a-url",
+            label: "Bad",
+            enabled: true
+          }
+        ]
+      }
+    };
+
+    const result = ConfigSchema.safeParse(badConfig);
+    expect(result.success).toBe(false);
+  });
 });
