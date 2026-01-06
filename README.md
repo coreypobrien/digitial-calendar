@@ -25,6 +25,27 @@ A local-first calendar display for a Raspberry Pi touchscreen. It serves a full-
    npm run dev:admin
    ```
 
+## Docker (Dev Server)
+Build and run the server in a container (compatible with Raspberry Pi/armv7):
+```bash
+docker build -t wall-calendar .
+docker run --rm -p 3000:3000 --env-file .env wall-calendar
+```
+The container defaults to `npm run dev:server` and exposes port 3000.
+
+To live-reload from local files, mount the repo and mask `node_modules` so the
+container keeps its installed dependencies:
+```bash
+docker run --rm -p 3000:3000 \
+  --env-file .env \
+  -v "$(pwd):/app" \
+  -v /app/node_modules \
+  -v /app/server/node_modules \
+  -v /app/client-display/node_modules \
+  -v /app/client-admin/node_modules \
+  wall-calendar
+```
+
 ## First-Time Admin Setup
 Call the setup endpoint once to create your admin user:
 ```bash
