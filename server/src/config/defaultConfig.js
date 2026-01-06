@@ -19,6 +19,9 @@ export const defaultConfig = {
     weatherMinutes: 30
   },
   calendars: [],
+  ical: {
+    feeds: []
+  },
   google: {
     syncDays: 30
   },

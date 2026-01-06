@@ -1,5 +1,5 @@
 import { loadConfig } from "../storage/configStore.js";
-import { syncCalendarEvents } from "../services/googleCalendar.js";
+import { syncCalendarEvents } from "../services/calendarSync.js";
 
 let timer = null;
 let running = false;
@@ -20,6 +20,8 @@ const runSync = async (logger) => {
   } catch (error) {
     if (error?.code === "NOT_CONNECTED") {
       logger.info("Calendar auto-sync skipped (not connected)");
+    } else if (error?.code === "NO_SOURCES") {
+      logger.info("Calendar auto-sync skipped (no sources configured)");
     } else {
       logger.warn({ err: error }, "Calendar auto-sync failed");
     }

@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { syncCalendarEvents } from "../services/googleCalendar.js";
+import { syncCalendarEvents } from "../services/calendarSync.js";
 import { loadConfig, saveConfig } from "../storage/configStore.js";
 import { loadEventCache } from "../storage/eventStore.js";
 
@@ -60,6 +60,14 @@ router.post("/extend", async (req, res, next) => {
       if (error?.code === "NOT_CONNECTED") {
         res.status(409).json({
           error: "Google account not connected",
+          updated: true,
+          syncDays: saved.google.syncDays
+        });
+        return;
+      }
+      if (error?.code === "NO_SOURCES") {
+        res.status(409).json({
+          error: "No calendar sources configured",
           updated: true,
           syncDays: saved.google.syncDays
         });

@@ -7,7 +7,7 @@ import supertest from "supertest";
 let tempDir;
 let app;
 
-vi.mock("../services/googleCalendar.js", () => ({
+vi.mock("../services/calendarSync.js", () => ({
   syncCalendarEvents: vi.fn(async () => ({
     updatedAt: new Date().toISOString(),
     events: 0,
@@ -46,5 +46,19 @@ describe("events route", () => {
     const { loadConfig } = await import("../storage/configStore.js");
     const { config } = await loadConfig();
     expect(config.google.syncDays).toBe(res.body.syncDays);
+  });
+
+  it("returns a config error when no sources are configured", async () => {
+    const { syncCalendarEvents } = await import("../services/calendarSync.js");
+    syncCalendarEvents.mockImplementationOnce(async () => {
+      const error = new Error("No calendar sources configured");
+      error.code = "NO_SOURCES";
+      throw error;
+    });
+    const target = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000).toISOString();
+    const res = await supertest(app).post("/api/events/extend").send({ timeMax: target });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("No calendar sources configured");
+    expect(res.body.updated).toBe(true);
   });
 });
