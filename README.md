@@ -5,7 +5,7 @@ A local-first calendar display for a Raspberry Pi touchscreen. It serves a full-
 ## Requirements
 - Node.js 20+
 - npm
-- Google Calendar API credentials (OAuth 2.0)
+- Google Calendar API credentials (OAuth 2.0, optional if using iCal feeds only)
 - weather.gov is used for weather (no API key, U.S. only)
 
 ## Setup
@@ -71,6 +71,11 @@ The server will serve the compiled display and admin apps from `/client-display/
 Notes:
 - The admin panel lists individual calendars so you can enable/disable sources.
 - Month navigation can extend the sync window as you browse future months.
+
+## iCal Feeds (Optional)
+Add iCal feeds in the Admin panel under Calendars → iCal Feeds. The label field
+overrides the calendar name shown in the UI; if left blank, the feed metadata or URL
+hostname is used.
 
 ## Configuration Storage
 Configuration is stored in JSON files under `data/` (gitignored). The main config file is:

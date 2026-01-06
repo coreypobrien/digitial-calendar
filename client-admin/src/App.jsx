@@ -235,6 +235,22 @@ export default function App() {
     }
     setSaving(true);
     setSaveNotice("");
+    const badFeed = (config.ical?.feeds || []).find((feed) => {
+      if (!feed?.url || !feed.url.trim()) {
+        return true;
+      }
+      try {
+        const parsed = new URL(feed.url.trim());
+        return parsed.protocol !== "http:" && parsed.protocol !== "https:";
+      } catch {
+        return true;
+      }
+    });
+    if (badFeed) {
+      setSaving(false);
+      setSaveNotice("Fix or remove invalid iCal feed URLs before saving.");
+      return;
+    }
     const res = await fetchJson("/api/settings", {
       method: "PUT",
       credentials: "include",
@@ -316,6 +332,58 @@ export default function App() {
             ]
           : [...list, nextEntry];
       return { ...prev, calendars: nextList };
+    });
+  };
+
+  const addIcalFeed = () => {
+    updateConfig((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const feeds = prev.ical?.feeds || [];
+      return {
+        ...prev,
+        ical: {
+          ...prev.ical,
+          feeds: [...feeds, { url: "", label: "", enabled: true }]
+        }
+      };
+    });
+  };
+
+  const updateIcalFeed = (index, updates) => {
+    updateConfig((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const feeds = prev.ical?.feeds || [];
+      const nextFeeds = feeds.map((feed, feedIndex) =>
+        feedIndex === index ? { ...feed, ...updates } : feed
+      );
+      return {
+        ...prev,
+        ical: {
+          ...prev.ical,
+          feeds: nextFeeds
+        }
+      };
+    });
+  };
+
+  const removeIcalFeed = (index) => {
+    updateConfig((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const feeds = prev.ical?.feeds || [];
+      const nextFeeds = feeds.filter((_feed, feedIndex) => feedIndex !== index);
+      return {
+        ...prev,
+        ical: {
+          ...prev.ical,
+          feeds: nextFeeds
+        }
+      };
     });
   };
 
@@ -752,6 +820,73 @@ export default function App() {
                     </div>
                   ) : (
                     <p className="admin__muted">No calendars loaded yet.</p>
+                  )}
+                </div>
+                <div className="admin__panel">
+                  <div className="admin__panel-header">
+                    <h3>iCal Feeds</h3>
+                    <button
+                      type="button"
+                      className="admin__ghost"
+                      onClick={addIcalFeed}
+                    >
+                      Add feed
+                    </button>
+                  </div>
+                  <p className="admin__muted">
+                    Add one or more .ics URLs. The optional label overrides the calendar
+                    name shown in the display.
+                  </p>
+                  {config.ical?.feeds?.length ? (
+                    <div className="admin__ical-list">
+                      {config.ical.feeds.map((feed, index) => (
+                        <div key={`${feed.url || "feed"}-${index}`} className="admin__ical-item">
+                          <label className="admin__field">
+                            iCal URL
+                            <input
+                              type="text"
+                              value={feed.url ?? ""}
+                              placeholder="https://example.com/calendar.ics"
+                              onChange={(event) =>
+                                updateIcalFeed(index, { url: event.target.value })
+                              }
+                            />
+                          </label>
+                          <label className="admin__field">
+                            Label (optional)
+                            <input
+                              type="text"
+                              value={feed.label ?? ""}
+                              placeholder="Family Calendar"
+                              onChange={(event) =>
+                                updateIcalFeed(index, { label: event.target.value })
+                              }
+                            />
+                          </label>
+                          <div className="admin__ical-actions">
+                            <label className="admin__checkbox">
+                              <input
+                                type="checkbox"
+                                checked={feed.enabled ?? true}
+                                onChange={(event) =>
+                                  updateIcalFeed(index, { enabled: event.target.checked })
+                                }
+                              />
+                              Enabled
+                            </label>
+                            <button
+                              type="button"
+                              className="admin__ghost"
+                              onClick={() => removeIcalFeed(index)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="admin__muted">No iCal feeds configured.</p>
                   )}
                 </div>
               </>

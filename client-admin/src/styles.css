@@ -257,6 +257,37 @@ button {
   font-weight: 500;
 }
 
+.admin__ical-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.admin__ical-item {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: #f9f7f3;
+}
+
+.admin__ical-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.admin__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 900px) {
   .admin {
     grid-template-columns: 1fr;
@@ -265,5 +296,14 @@ button {
   .admin__sidebar {
     border-right: none;
     border-bottom: 1px solid var(--panel-border);
+  }
+
+  .admin__ical-item {
+    grid-template-columns: 1fr;
+  }
+
+  .admin__ical-actions {
+    flex-direction: row;
+    align-items: center;
   }
 }

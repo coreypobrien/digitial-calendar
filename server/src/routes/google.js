@@ -8,7 +8,8 @@ import {
   hasGoogleCredentials,
   loadTokens
 } from "../services/googleAuth.js";
-import { listCalendars, syncCalendarEvents } from "../services/googleCalendar.js";
+import { syncCalendarEvents } from "../services/calendarSync.js";
+import { listCalendars } from "../services/googleCalendar.js";
 
 const router = Router();
 
@@ -82,7 +83,7 @@ router.get("/calendars", requireAuth, async (_req, res, next) => {
 
 router.post("/sync", requireAuth, async (_req, res, next) => {
   try {
-    const summary = await syncCalendarEvents();
+    const summary = await syncCalendarEvents({ requireGoogle: true });
     res.json({ summary });
   } catch (error) {
     if (error.code === "NOT_CONNECTED") {
