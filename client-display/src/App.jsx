@@ -768,7 +768,10 @@ export default function App() {
                                 style={{ backgroundColor: event.calendarColor }}
                               />
                               <span className="display__event-chip-text">
-                                {formatEventTime(event, timeFormat)} {event.summary}
+                                <span className="display__event-chip-time">
+                                  {formatEventTime(event, timeFormat)}
+                                </span>
+                                <span className="display__event-chip-title">{event.summary}</span>
                               </span>
                             </div>
                           ))}
