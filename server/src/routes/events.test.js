@@ -61,4 +61,14 @@ describe("events route", () => {
     expect(res.body.error).toBe("No calendar sources configured");
     expect(res.body.updated).toBe(true);
   });
+
+  it("refreshes events by clearing cache and syncing", async () => {
+    const { syncCalendarEvents } = await import("../services/calendarSync.js");
+    syncCalendarEvents.mockClear();
+    const res = await supertest(app).post("/api/events/refresh");
+    expect(res.status).toBe(200);
+    expect(syncCalendarEvents).toHaveBeenCalled();
+    expect(Array.isArray(res.body.events)).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(res.body, "updatedAt")).toBe(true);
+  });
 });

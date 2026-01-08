@@ -64,6 +64,27 @@ body {
   color: var(--muted);
 }
 
+.display__refresh-button {
+  padding: 4px 8px;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.display__refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .display__weather {
   font-size: 20px;
   padding: 14px 18px;
@@ -727,6 +748,7 @@ body {
     align-items: baseline;
     gap: 16px;
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .display__date {
