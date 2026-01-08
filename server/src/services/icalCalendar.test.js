@@ -34,6 +34,18 @@ SUMMARY:Daily Standup (moved)
 END:VEVENT
 END:VCALENDAR`;
 
+const recurringIcsWithTimezone = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Wall Calendar//EN
+BEGIN:VEVENT
+UID:recurring-tz-1
+DTSTART;TZID=America/New_York:20260102T110000
+DTEND;TZID=America/New_York:20260102T120000
+RRULE:FREQ=DAILY;COUNT=2
+SUMMARY:Daily Standup
+END:VEVENT
+END:VCALENDAR`;
+
 describe("syncIcalEvents", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -98,6 +110,34 @@ describe("syncIcalEvents", () => {
     expect(ends).toEqual([
       "2024-01-01T11:00:00.000Z",
       "2024-01-03T13:00:00.000Z"
+    ]);
+  });
+
+  it("expands recurring events with timezones using UTC offsets", async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      text: async () => recurringIcsWithTimezone
+    });
+
+    const { events, errors } = await syncIcalEvents({
+      timeMin: "2026-01-02T12:00:00.000Z",
+      timeMax: "2026-01-04T00:00:00.000Z",
+      feeds: [{ url: "https://example.com/calendar.ics", label: "Test" }]
+    });
+
+    expect(errors).toEqual([]);
+    expect(events).toHaveLength(2);
+
+    const starts = events.map((event) => event.start).sort();
+    const ends = events.map((event) => event.end).sort();
+
+    expect(starts).toEqual([
+      "2026-01-02T16:00:00.000Z",
+      "2026-01-03T16:00:00.000Z"
+    ]);
+    expect(ends).toEqual([
+      "2026-01-02T17:00:00.000Z",
+      "2026-01-03T17:00:00.000Z"
     ]);
   });
 });
