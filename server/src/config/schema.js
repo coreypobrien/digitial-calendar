@@ -20,7 +20,7 @@ export const ConfigSchema = z.object({
     passwordHash: z.string()
   }),
   display: z.object({
-    defaultView: z.enum(["month", "week", "activity"]),
+    defaultView: z.enum(["month", "fourWeek", "week", "activity", "chores"]),
     timeFormat: z.enum(["12h", "24h"]),
     theme: ThemeSchema,
     resetMinutes: z.number().int().min(0).max(1440)

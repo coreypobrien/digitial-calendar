@@ -368,12 +368,11 @@ export default function App() {
     return JSON.stringify(config) !== lastSavedConfig;
   }, [config, lastSavedConfig]);
 
-  const displayDefaultValue =
-    config?.display?.defaultView === "activity"
-      ? "activity"
-      : config?.display?.defaultView === "week"
-        ? "week"
-        : "month";
+  const displayDefaultValue = ["month", "fourWeek", "week", "activity", "chores"].includes(
+    config?.display?.defaultView
+  )
+    ? config.display.defaultView
+    : "month";
 
   if (statusLoading) {
     return (
@@ -504,6 +503,7 @@ export default function App() {
                         }
                       >
                         <option value="month">Month</option>
+                        <option value="fourWeek">4-Week</option>
                         <option value="week">Week</option>
                         <option value="activity">Upcoming</option>
                         <option value="chores">Chores</option>
