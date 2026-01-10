@@ -15,6 +15,13 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -30,6 +37,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 32px;
+  overflow: hidden;
 }
 
 .display__header {
@@ -176,6 +184,12 @@ body {
   flex-direction: column;
   gap: 16px;
   min-height: 0;
+}
+
+.display__panel--day-empty {
+  min-height: 0;
+  height: auto;
+  align-self: flex-start;
 }
 
 .display__toggles {
@@ -363,7 +377,7 @@ body {
 
 .display__event-chip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: 12px;
   color: var(--muted);
@@ -372,9 +386,25 @@ body {
 }
 
 .display__event-chip-text {
-  display: block;
+  display: grid;
+  gap: 2px;
   min-width: 0;
-  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.display__event-chip-time {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.display__event-chip-title {
+  font-size: 11px;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -411,6 +441,7 @@ body {
 
 .display__list--scrollable {
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 6px;
 }
 
@@ -487,6 +518,7 @@ body {
   margin-top: 0;
   display: grid;
   gap: 16px;
+  align-content: start;
 }
 
 .display__all-day {
@@ -572,7 +604,7 @@ body {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
   display: grid;
   gap: 16px;
-  overflow: auto;
+  overflow: hidden;
   z-index: 1;
 }
 
@@ -664,6 +696,10 @@ body {
   font-size: 28px;
 }
 
+.display__panel--day h2 {
+  margin: 0 0 8px;
+}
+
 @media (max-width: 900px) {
   .display {
     padding: 28px;
@@ -684,6 +720,264 @@ body {
 
   .display__time {
     font-size: 48px;
+  }
+}
+
+@media (orientation: portrait) {
+  .display {
+    padding: 64px 72px;
+    gap: 40px;
+  }
+
+  .display__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .display__header > div:first-child {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .display__date {
+    font-size: 32px;
+    margin: 0;
+  }
+
+  .display__time {
+    font-size: 72px;
+    margin: 0;
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .display__subtle {
+    width: 100%;
+  }
+
+  .display__weather {
+    width: 100%;
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 20px;
+  }
+
+  .display__forecast {
+    padding-top: 0;
+    border-top: none;
+    padding-left: 16px;
+    border-left: 1px solid rgba(31, 31, 31, 0.08);
+  }
+
+  .display__content {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .display__month-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .display__toggles {
+    margin-left: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .display__daily-event {
+    min-height: 56px;
+    max-height: 56px;
+    overflow: hidden;
+  }
+
+  .display__daily-event-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .display__panel--day {
+    height: auto;
+    align-self: flex-start;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 1200px) {
+  .display {
+    padding: 32px 28px;
+    gap: 24px;
+  }
+
+  .display__header {
+    gap: 16px;
+  }
+
+  .display__header > div:first-child {
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  .display__date {
+    font-size: clamp(20px, 3.2vw, 26px);
+    white-space: nowrap;
+  }
+
+  .display__time {
+    font-size: clamp(42px, 7.2vw, 56px);
+    white-space: nowrap;
+  }
+
+  .display__weather {
+    padding: 10px 12px;
+    border-radius: 18px;
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+    column-gap: 12px;
+  }
+
+  .display__weather strong {
+    font-size: 22px;
+  }
+
+  .display__weather span {
+    font-size: 12px;
+  }
+
+  .display__forecast {
+    gap: 4px;
+    padding-left: 10px;
+  }
+
+  .display__forecast-name,
+  .display__forecast-badge,
+  .display__forecast-temps {
+    font-size: 8px;
+  }
+
+  .display__content {
+    gap: 16px;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .display__panel {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .display__panel--day-empty {
+    padding: 14px 16px;
+  }
+
+  .display__panel--day {
+    padding: 14px 16px;
+    gap: 10px;
+    height: auto;
+    align-self: flex-start;
+  }
+
+  .display__panel:last-child {
+    min-height: 0;
+  }
+
+  .display__month-header {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .display__month-label {
+    font-size: 18px;
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+
+  .display__month-actions {
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+
+  .display__nav-button {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+
+  .display__toggles {
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+
+  .display__toggle {
+    padding: 4px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .display__calendar-header,
+  .display__calendar-grid,
+  .display__week-grid {
+    gap: 6px;
+  }
+
+  .display__day {
+    min-height: 62px;
+    padding: 6px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .display__day-label {
+    font-size: 10px;
+  }
+
+  .display__day-events {
+    gap: 4px;
+    overflow: hidden;
+  }
+
+  .display__event-chip {
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .display__event-chip-title {
+    font-size: 10px;
+  }
+
+  .display__day-view {
+    gap: 10px;
+  }
+
+  .display__day-view--empty {
+    gap: 6px;
+  }
+
+  .display__daily-stack {
+    gap: 8px;
+  }
+
+  .display__daily-event {
+    height: auto !important;
+    min-height: 48px;
+    padding: 6px 8px;
+  }
+
+  .display__panel--day h2 {
+    font-size: 20px;
+  }
+
+  .display__muted {
+    font-size: 12px;
+  }
+
+  .display__day-events .display__event-chip:nth-of-type(n + 3) {
+    display: none;
   }
 }
 
@@ -735,7 +1029,7 @@ body {
   flex-direction: column;
   gap: 12px;
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .chore-item {

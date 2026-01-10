@@ -450,6 +450,7 @@ export default function App() {
 
     return events.sort((a, b) => a.startSlot - b.startSlot);
   }, [selectedEvents, timeFormat, dailyWindow]);
+  const isDayEmpty = !allDayEvents.length && !timedEvents.length;
 
   useEffect(() => {
     if (!resetMinutes || resetMinutes <= 0) {
@@ -664,7 +665,11 @@ export default function App() {
           ) : null}
         </div>
       </header>
-      <section className={`display__content ${view === "chores" ? "display__content--chores" : ""}`}>
+      <section
+        className={`display__content ${view === "chores" ? "display__content--chores" : ""} ${
+          isDayEmpty ? "display__content--day-empty" : ""
+        }`}
+      >
         <div className="display__panel">
           <div className="display__month-header">
             <div className="display__month-label">{panelLabel}</div>
@@ -768,7 +773,10 @@ export default function App() {
                                 style={{ backgroundColor: event.calendarColor }}
                               />
                               <span className="display__event-chip-text">
-                                {formatEventTime(event, timeFormat)} {event.summary}
+                                <span className="display__event-chip-time">
+                                  {formatEventTime(event, timeFormat)}
+                                </span>
+                                <span className="display__event-chip-title">{event.summary}</span>
                               </span>
                             </div>
                           ))}
@@ -886,9 +894,13 @@ export default function App() {
           ) : null}
           {view === "chores" ? <ChoreView /> : null}
         </div>
-        <div className="display__panel">
+        <div
+          className={`display__panel display__panel--day ${
+            isDayEmpty ? "display__panel--day-empty" : ""
+          }`}
+        >
           <h2>{formatDate(selectedDate)}</h2>
-          <div className="display__day-view">
+          <div className={`display__day-view ${isDayEmpty ? "display__day-view--empty" : ""}`}>
             {allDayEvents.length ? (
               <div className="display__all-day">
                 <div className="display__all-day-label">All day</div>
@@ -930,7 +942,7 @@ export default function App() {
                 </div>
               ))}
             </div>
-            {!allDayEvents.length && !timedEvents.length ? (
+            {isDayEmpty ? (
               <p className="display__muted">No events scheduled for this day.</p>
             ) : null}
           </div>
