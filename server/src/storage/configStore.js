@@ -31,8 +31,10 @@ const normalizeConfig = (config) => {
   const next = { ...config };
   if (
     next.display?.defaultView !== "month" &&
+    next.display?.defaultView !== "fourWeek" &&
     next.display?.defaultView !== "week" &&
-    next.display?.defaultView !== "activity"
+    next.display?.defaultView !== "activity" &&
+    next.display?.defaultView !== "chores"
   ) {
     next.display = { ...next.display, defaultView: "month" };
   }

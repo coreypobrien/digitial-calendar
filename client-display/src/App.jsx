@@ -77,6 +77,7 @@ const getForecastBadge = (description = "") => {
 
 const viewLabels = {
   month: "Monthly View",
+  fourWeek: "4-Week View",
   week: "Weekly View",
   activity: "Upcoming",
   chores: "Chores"
@@ -104,10 +105,10 @@ export default function App() {
       setMonthOffset(monthDiff);
     }
   };
-  const shiftWeek = (direction) => {
+  const shiftWeek = (direction, weekCount = 1) => {
     setSelectedDate((prev) => {
       const next = new Date(prev);
-      next.setDate(next.getDate() + direction * 7);
+      next.setDate(next.getDate() + direction * 7 * weekCount);
       return next;
     });
   };
@@ -390,6 +391,18 @@ export default function App() {
     [weekStartDate, weekEndDate]
   );
 
+  const fourWeekEndDate = useMemo(() => {
+    const end = new Date(weekStartDate);
+    end.setDate(end.getDate() + 27);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }, [weekStartDate]);
+
+  const fourWeekLabel = useMemo(
+    () => formatWeekLabel(weekStartDate, fourWeekEndDate),
+    [weekStartDate, fourWeekEndDate]
+  );
+
   const todayKey = useMemo(() => toLocalDateKey(now), [now]);
   const selectedKey = useMemo(() => toLocalDateKey(selectedDate), [selectedDate]);
   const selectedEvents = useMemo(
@@ -492,7 +505,7 @@ export default function App() {
   }, [activeMonthDate, selectedDate, view]);
 
   useEffect(() => {
-    if (view !== "month" && view !== "week") {
+    if (view !== "month" && view !== "week" && view !== "fourWeek") {
       return;
     }
     const rangeMax = eventsCache?.range?.timeMax;
@@ -514,7 +527,9 @@ export default function App() {
             59,
             999
           )
-        : new Date(weekEndDate);
+        : view === "week"
+          ? new Date(weekEndDate)
+          : new Date(fourWeekEndDate);
     if (targetEnd <= rangeEnd) {
       if (rangeRequest) {
         setRangeRequest(null);
@@ -546,7 +561,14 @@ export default function App() {
       }
     };
     extend();
-  }, [activeMonthDate, eventsCache?.range?.timeMax, rangeRequest, view, weekEndDate]);
+  }, [
+    activeMonthDate,
+    eventsCache?.range?.timeMax,
+    rangeRequest,
+    view,
+    weekEndDate,
+    fourWeekEndDate
+  ]);
 
   const upcomingEvents = useMemo(() => {
     const nowMs = now.getTime();
@@ -594,8 +616,26 @@ export default function App() {
     return cells;
   }, [activeMonthDate, sortedEvents]);
 
+  const fourWeekCells = useMemo(() => {
+    const cells = [];
+    for (let i = 0; i < 28; i += 1) {
+      const date = new Date(weekStartDate);
+      date.setDate(weekStartDate.getDate() + i);
+      const key = toLocalDateKey(date);
+      const events = sortedEvents.filter((event) => eventOccursOnDateKey(event, key));
+      cells.push({ key, date, events });
+    }
+    return cells;
+  }, [sortedEvents, weekStartDate]);
+
   const panelLabel =
-    view === "month" ? formatMonthLabel(activeMonthDate) : view === "week" ? weekLabel : "Upcoming";
+    view === "month"
+      ? formatMonthLabel(activeMonthDate)
+      : view === "week"
+        ? weekLabel
+        : view === "fourWeek"
+          ? fourWeekLabel
+          : "Upcoming";
 
   const weekCells = useMemo(() => {
     const cells = [];
@@ -707,6 +747,25 @@ export default function App() {
                   className="display__nav-button"
                   onClick={() => shiftWeek(1)}
                   aria-label="Next week"
+                >
+                  &gt;
+                </button>
+              </div>
+            ) : view === "fourWeek" ? (
+              <div className="display__month-actions">
+                <button
+                  type="button"
+                  className="display__nav-button"
+                  onClick={() => shiftWeek(-1, 4)}
+                  aria-label="Previous 4 weeks"
+                >
+                  &lt;
+                </button>
+                <button
+                  type="button"
+                  className="display__nav-button"
+                  onClick={() => shiftWeek(1, 4)}
+                  aria-label="Next 4 weeks"
                 >
                   &gt;
                 </button>
@@ -847,6 +906,69 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          ) : null}
+          {view === "fourWeek" ? (
+            <div className="display__month">
+              <div className="display__calendar">
+                <div className="display__calendar-header">
+                  {dayLabels.map((label) => (
+                    <div key={label} className="display__day-label">
+                      {label}
+                    </div>
+                  ))}
+                </div>
+                <div className="display__calendar-grid">
+                  {fourWeekCells.map((cell) => {
+                    const isToday = cell.key === todayKey;
+                    const isSelected = cell.key === selectedKey;
+                    const events = cell.events || [];
+                    return (
+                      <div
+                        key={cell.key}
+                        className={
+                          isToday
+                            ? "display__day display__day--today"
+                            : isSelected
+                              ? "display__day display__day--selected"
+                              : "display__day"
+                        }
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedDate(cell.date)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            setSelectedDate(cell.date);
+                          }
+                        }}
+                      >
+                        <div className="display__day-number">{cell.date.getDate()}</div>
+                        <div className="display__day-events">
+                          {events.slice(0, 3).map((event) => (
+                            <div key={event.id} className="display__event-chip">
+                              <span
+                                className="display__event-dot"
+                                style={{ backgroundColor: event.calendarColor }}
+                              />
+                              <span className="display__event-chip-text">
+                                <span className="display__event-chip-time">
+                                  {formatEventTime(event, timeFormat)}
+                                </span>
+                                <span className="display__event-chip-title">{event.summary}</span>
+                              </span>
+                            </div>
+                          ))}
+                          {events.length > 3 ? (
+                            <div className="display__event-more">
+                              +{events.length - 3} more
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ) : null}
