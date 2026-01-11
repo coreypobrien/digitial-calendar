@@ -42,12 +42,32 @@ export const eventOccursOnDateKey = (event, dateKey) => {
   return startMs < dayEnd.getTime() && endMs > dayStart.getTime();
 };
 
+export const isMultiDayEvent = (event) => {
+  if (!event?.start) {
+    return false;
+  }
+  const startMs = getEventStartMs(event);
+  const endMs = getEventEndMs(event);
+  if (!startMs || !endMs || endMs <= startMs) {
+    return false;
+  }
+  const startKey = toLocalDateKey(new Date(startMs));
+  const inclusiveEndMs = endMs > startMs ? endMs - 1 : endMs;
+  const endKey = toLocalDateKey(new Date(inclusiveEndMs));
+  return startKey !== endKey;
+};
+
 export const getEventStartMs = (event) => {
   if (!event?.start) {
     return 0;
   }
   if (event.allDay && typeof event.start === "string") {
-    return new Date(`${event.start}T00:00:00`).getTime();
+    const dateKey = event.start.slice(0, 10);
+    return new Date(`${dateKey}T00:00:00`).getTime();
+  }
+  if (event.allDay && event.start instanceof Date) {
+    const dateKey = toLocalDateKey(event.start);
+    return new Date(`${dateKey}T00:00:00`).getTime();
   }
   const start = new Date(event.start);
   return Number.isNaN(start.getTime()) ? 0 : start.getTime();
@@ -58,7 +78,12 @@ export const getEventEndMs = (event) => {
     return 0;
   }
   if (event.allDay && typeof event.end === "string") {
-    return new Date(`${event.end}T00:00:00`).getTime();
+    const dateKey = event.end.slice(0, 10);
+    return new Date(`${dateKey}T00:00:00`).getTime();
+  }
+  if (event.allDay && event.end instanceof Date) {
+    const dateKey = toLocalDateKey(event.end);
+    return new Date(`${dateKey}T00:00:00`).getTime();
   }
   const end = new Date(event.end);
   return Number.isNaN(end.getTime()) ? 0 : end.getTime();

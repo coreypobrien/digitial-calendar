@@ -8,6 +8,7 @@ import {
   getEventEndMs,
   getEventStartMs,
   getUpcomingDateParts,
+  isMultiDayEvent,
   toLocalDateKey
 } from "./utils/events.js";
 
@@ -61,6 +62,18 @@ const getWeekStart = (date) => {
 };
 
 const getMinutesIntoDay = (date) => date.getHours() * 60 + date.getMinutes();
+
+const getDayStartMs = (date) => {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
+};
+
+const getDayEndMs = (date) => {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end.getTime();
+};
 
 const normalizeMergeValue = (value) => (value ? String(value) : "");
 
@@ -151,6 +164,97 @@ const getEventCalendarLabels = (event) => {
     return [event.calendarLabel];
   }
   return labels;
+};
+
+const chunkArray = (items, size) => {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+const buildMultiDayRows = (weekDates, events) => {
+  const dateKeys = weekDates.map((date) => (date ? toLocalDateKey(date) : null));
+  const visibleIndices = dateKeys
+    .map((key, index) => (key ? index : null))
+    .filter((value) => value !== null);
+  if (!visibleIndices.length) {
+    return [];
+  }
+  const firstVisibleIndex = visibleIndices[0];
+  const lastVisibleIndex = visibleIndices[visibleIndices.length - 1];
+  const visibleStartMs = getDayStartMs(weekDates[firstVisibleIndex]);
+  const visibleEndMs = getDayEndMs(weekDates[lastVisibleIndex]);
+
+  const segments = [];
+  for (const event of events) {
+    if (!isMultiDayEvent(event)) {
+      continue;
+    }
+    let startIndex = null;
+    let endIndex = null;
+    for (let i = 0; i < dateKeys.length; i += 1) {
+      const key = dateKeys[i];
+      if (!key) {
+        continue;
+      }
+      if (eventOccursOnDateKey(event, key)) {
+        if (startIndex === null) {
+          startIndex = i;
+        }
+        endIndex = i;
+      }
+    }
+    if (startIndex === null || endIndex === null) {
+      continue;
+    }
+    const startMs = getEventStartMs(event);
+    let endMs = getEventEndMs(event);
+    if (!endMs || endMs <= startMs) {
+      endMs = startMs + 60 * 60 * 1000;
+    }
+    segments.push({
+      event,
+      startIndex,
+      endIndex,
+      startsBefore: startMs < visibleStartMs,
+      endsAfter: endMs > visibleEndMs
+    });
+  }
+
+  segments.sort((a, b) => {
+    if (a.startIndex !== b.startIndex) {
+      return a.startIndex - b.startIndex;
+    }
+    const aSpan = a.endIndex - a.startIndex;
+    const bSpan = b.endIndex - b.startIndex;
+    if (aSpan !== bSpan) {
+      return bSpan - aSpan;
+    }
+    return getEventStartMs(a.event) - getEventStartMs(b.event);
+  });
+
+  const rows = [];
+  for (const segment of segments) {
+    let placed = false;
+    for (const row of rows) {
+      const overlaps = row.some(
+        (existing) =>
+          segment.startIndex <= existing.endIndex &&
+          segment.endIndex >= existing.startIndex
+      );
+      if (!overlaps) {
+        row.push(segment);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      rows.push([segment]);
+    }
+  }
+  return rows;
 };
 
 const getForecastBadge = (description = "") => {
@@ -486,6 +590,33 @@ export default function App() {
     return `${startDateLabel} · ${timeLabel}`;
   };
 
+  const formatUpcomingRange = (event) => {
+    if (!event?.start) {
+      return "";
+    }
+    const start = new Date(event.start);
+    const endRaw = event.end ? new Date(event.end) : null;
+    if (Number.isNaN(start.getTime())) {
+      return "";
+    }
+    const dateOptions = { month: "short", day: "numeric" };
+    const startLabel = start.toLocaleDateString([], dateOptions);
+    if (isMultiDayEvent(event) && endRaw && !Number.isNaN(endRaw.getTime())) {
+      const end = new Date(endRaw);
+      if (event.allDay) {
+        end.setDate(end.getDate() - 1);
+      }
+      const endLabel = end.toLocaleDateString([], dateOptions);
+      if (endLabel !== startLabel) {
+        return `${startLabel} - ${endLabel}`;
+      }
+    }
+    if (event.allDay) {
+      return startLabel;
+    }
+    return formatEventTime(event, timeFormat);
+  };
+
   const renderEventDots = (event) => {
     const colors = getEventCalendarColors(event);
     if (!colors.length) {
@@ -780,6 +911,13 @@ export default function App() {
       const events = sortedEvents.filter((event) => eventOccursOnDateKey(event, key));
       cells.push({ key, day, date, events });
     }
+    const remainder = cells.length % 7;
+    if (remainder !== 0) {
+      const remaining = 7 - remainder;
+      for (let i = 0; i < remaining; i += 1) {
+        cells.push({ key: `empty-tail-${i}`, day: null });
+      }
+    }
     return cells;
   }, [activeMonthDate, sortedEvents]);
 
@@ -815,6 +953,43 @@ export default function App() {
     }
     return cells;
   }, [sortedEvents, weekStartDate]);
+
+  const monthWeekRows = useMemo(
+    () =>
+      chunkArray(monthCells, 7).map((week) => ({
+        cells: week,
+        multiDayRows: buildMultiDayRows(
+          week.map((cell) => cell.date || null),
+          sortedEvents
+        )
+      })),
+    [monthCells, sortedEvents]
+  );
+
+  const fourWeekRows = useMemo(
+    () =>
+      chunkArray(fourWeekCells, 7).map((week) => ({
+        cells: week,
+        multiDayRows: buildMultiDayRows(
+          week.map((cell) => cell.date || null),
+          sortedEvents
+        )
+      })),
+    [fourWeekCells, sortedEvents]
+  );
+
+  const weekRows = useMemo(
+    () => [
+      {
+        cells: weekCells,
+        multiDayRows: buildMultiDayRows(
+          weekCells.map((cell) => cell.date || null),
+          sortedEvents
+        )
+      }
+    ],
+    [weekCells, sortedEvents]
+  );
 
   return (
     <main className="display">
@@ -974,53 +1149,134 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="display__calendar-grid">
-                  {monthCells.map((cell) => {
-                    if (!cell.day) {
-                      return <div key={cell.key} className="display__day display__day--empty" />;
-                    }
-                    const isToday = toLocalDateKey(cell.date) === todayKey;
-                    const isSelected = toLocalDateKey(cell.date) === selectedKey;
-                    const events = cell.events || [];
-                    return (
-                      <div
-                        key={cell.key}
-                        className={
-                          isToday
-                            ? "display__day display__day--today"
-                            : isSelected
-                              ? "display__day display__day--selected"
-                              : "display__day"
-                        }
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedDate(cell.date)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            setSelectedDate(cell.date);
+                <div className="display__calendar-weeks">
+                  {monthWeekRows.map((week, weekIndex) => (
+                    <div
+                      key={`month-week-${weekIndex}`}
+                      className={`display__week-row${
+                        week.multiDayRows.length ? " display__week-row--has-multi" : ""
+                      }`}
+                      style={{
+                        "--multi-rows": week.multiDayRows.length,
+                        "--multi-gaps": Math.max(0, week.multiDayRows.length - 1)
+                      }}
+                    >
+                      <div className="display__calendar-grid display__week-days">
+                        {week.cells.map((cell) => {
+                          if (!cell.day) {
+                            return (
+                              <div
+                                key={cell.key}
+                                className="display__day display__day--empty"
+                              />
+                            );
                           }
-                        }}
-                      >
-                        <div className="display__day-number">{cell.day}</div>
-                        <div className="display__day-events">
-                          {events.slice(0, 3).map((event) => (
-                            <div key={event.id} className="display__event-chip">
-                              {renderEventDots(event)}
-                              <span className="display__event-chip-text">
-                                <span className="display__event-chip-time">
-                                  {formatEventTime(event, timeFormat)}
-                                </span>
-                                <span className="display__event-chip-title">{event.summary}</span>
-                              </span>
+                          const isToday = toLocalDateKey(cell.date) === todayKey;
+                          const isSelected = toLocalDateKey(cell.date) === selectedKey;
+                          const events = (cell.events || []).filter(
+                            (event) => !isMultiDayEvent(event)
+                          );
+                          const visibleLimit = Math.max(0, 3 - week.multiDayRows.length);
+                          const visibleEvents = events.slice(0, visibleLimit);
+                          const hiddenCount = Math.max(0, events.length - visibleLimit);
+                          return (
+                            <div
+                              key={cell.key}
+                              className={
+                                isToday
+                                  ? "display__day display__day--today"
+                                  : isSelected
+                                    ? "display__day display__day--selected"
+                                    : "display__day"
+                              }
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setSelectedDate(cell.date)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  setSelectedDate(cell.date);
+                                }
+                              }}
+                            >
+                              <div className="display__day-number">{cell.day}</div>
+                              <div className="display__day-events">
+                                {visibleEvents.map((event) => (
+                                  <div key={event.id} className="display__event-chip">
+                                    {renderEventDots(event)}
+                                    <span className="display__event-chip-text">
+                                      {!event.allDay && !isMultiDayEvent(event) ? (
+                                        <span className="display__event-chip-time">
+                                          {formatEventTime(event, timeFormat)}
+                                        </span>
+                                      ) : null}
+                                      <span className="display__event-chip-title">
+                                        {event.summary}
+                                      </span>
+                                    </span>
+                                  </div>
+                                ))}
+                                {hiddenCount > 0 ? (
+                                  <div className="display__event-more">
+                                    +{hiddenCount} more
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {week.multiDayRows.length ? (
+                        <div className="display__week-multi display__week-multi--lined">
+                          {week.multiDayRows.map((row, rowIndex) => (
+                            <div
+                              key={`month-week-${weekIndex}-row-${rowIndex}`}
+                              className="display__week-multi-row"
+                            >
+                              {row.map((segment) => {
+                                const event = segment.event;
+                                const showTime =
+                                  !event.allDay && !isMultiDayEvent(event);
+                                const timeLabel = showTime
+                                  ? formatEventRange(event, timeFormat)
+                                  : "";
+                                const className = [
+                                  "display__multi-event",
+                                  segment.startsBefore ? "display__multi-event--continued-start" : "",
+                                  segment.endsAfter ? "display__multi-event--continued-end" : ""
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ");
+                                return (
+                                  <button
+                                    type="button"
+                                    key={`${event.id || event.summary}-${weekIndex}-${segment.startIndex}-${segment.endIndex}`}
+                                    className={className}
+                                    style={{
+                                      gridColumn: `${segment.startIndex + 1} / ${segment.endIndex + 2}`,
+                                      borderLeftColor: getEventPrimaryColor(event) || event.calendarColor
+                                    }}
+                                    onClick={() => setActiveEvent(event)}
+                                  >
+                                    {renderEventDots(event)}
+                                    <span className="display__multi-event-text">
+                                      <span className="display__multi-event-title">
+                                        {event.summary}
+                                      </span>
+                                      {timeLabel ? (
+                                        <span className="display__multi-event-time">
+                                          {timeLabel}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           ))}
-                          {events.length > 3 ? (
-                            <div className="display__event-more">+{events.length - 3} more</div>
-                          ) : null}
                         </div>
-                      </div>
-                    );
-                  })}
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1034,53 +1290,123 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <div className="display__week-grid">
-                {weekCells.map((cell) => {
-                  const isToday = cell.key === todayKey;
-                  const isSelected = cell.key === selectedKey;
-                  const events = cell.events || [];
-                  return (
-                    <div
-                      key={cell.key}
-                      className={
-                        isToday
-                          ? "display__day display__day--week display__day--today"
-                          : isSelected
-                            ? "display__day display__day--week display__day--selected"
-                            : "display__day display__day--week"
-                      }
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedDate(cell.date)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          setSelectedDate(cell.date);
-                        }
-                      }}
-                    >
-                      <div className="display__day-number">{cell.date.getDate()}</div>
-                      <div className="display__day-events">
-                        {events.slice(0, WEEK_EVENT_LIMIT).map((event) => (
+              <div className="display__calendar-weeks">
+                {weekRows.map((week, weekIndex) => (
+                  <div
+                    key={`week-row-${weekIndex}`}
+                    className={`display__week-row${
+                      week.multiDayRows.length ? " display__week-row--has-multi" : ""
+                    }`}
+                    style={{
+                      "--multi-rows": week.multiDayRows.length,
+                      "--multi-gaps": Math.max(0, week.multiDayRows.length - 1)
+                    }}
+                  >
+                    <div className="display__week-grid display__week-days">
+                      {week.cells.map((cell) => {
+                        const isToday = cell.key === todayKey;
+                        const isSelected = cell.key === selectedKey;
+                        const events = (cell.events || []).filter(
+                          (event) => !isMultiDayEvent(event)
+                        );
+                        return (
                           <div
-                            key={event.id}
-                            className="display__week-event"
-                            style={{ borderLeftColor: getEventPrimaryColor(event) || event.calendarColor }}
+                            key={cell.key}
+                            className={
+                              isToday
+                                ? "display__day display__day--week display__day--today"
+                                : isSelected
+                                  ? "display__day display__day--week display__day--selected"
+                                  : "display__day display__day--week"
+                            }
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedDate(cell.date)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                setSelectedDate(cell.date);
+                              }
+                            }}
                           >
-                            <span className="display__week-event-time">
-                              {formatEventRange(event, timeFormat)}
-                            </span>
-                            <span className="display__week-event-title">{event.summary}</span>
+                            <div className="display__day-number">{cell.date.getDate()}</div>
+                            <div className="display__day-events">
+                              {events.slice(0, WEEK_EVENT_LIMIT).map((event) => (
+                                <div
+                                  key={event.id}
+                                  className="display__week-event"
+                                  style={{
+                                    borderLeftColor: getEventPrimaryColor(event) || event.calendarColor
+                                  }}
+                                >
+                                  {!event.allDay && !isMultiDayEvent(event) ? (
+                                    <span className="display__week-event-time">
+                                      {formatEventRange(event, timeFormat)}
+                                    </span>
+                                  ) : null}
+                                  <span className="display__week-event-title">{event.summary}</span>
+                                </div>
+                              ))}
+                              {events.length > WEEK_EVENT_LIMIT ? (
+                                <div className="display__event-more">
+                                  +{events.length - WEEK_EVENT_LIMIT} more
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {week.multiDayRows.length ? (
+                      <div className="display__week-multi display__week-multi--curved">
+                        {week.multiDayRows.map((row, rowIndex) => (
+                          <div
+                            key={`week-row-${weekIndex}-${rowIndex}`}
+                            className="display__week-multi-row"
+                          >
+                            {row.map((segment) => {
+                              const event = segment.event;
+                              const showTime =
+                                !event.allDay && !isMultiDayEvent(event);
+                              const timeLabel = showTime
+                                ? formatEventRange(event, timeFormat)
+                                : "";
+                              const className = [
+                                "display__multi-event",
+                                segment.startsBefore ? "display__multi-event--continued-start" : "",
+                                segment.endsAfter ? "display__multi-event--continued-end" : ""
+                              ]
+                                .filter(Boolean)
+                                .join(" ");
+                              return (
+                                <button
+                                  type="button"
+                                  key={`${event.id || event.summary}-${weekIndex}-${segment.startIndex}-${segment.endIndex}`}
+                                  className={className}
+                                  style={{
+                                    gridColumn: `${segment.startIndex + 1} / ${segment.endIndex + 2}`,
+                                    borderLeftColor: getEventPrimaryColor(event) || event.calendarColor
+                                  }}
+                                  onClick={() => setActiveEvent(event)}
+                                >
+                                  <span className="display__multi-event-text">
+                                    <span className="display__multi-event-title">
+                                      {event.summary}
+                                    </span>
+                                    {timeLabel ? (
+                                      <span className="display__multi-event-time">
+                                        {timeLabel}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </button>
+                              );
+                            })}
                           </div>
                         ))}
-                        {events.length > WEEK_EVENT_LIMIT ? (
-                          <div className="display__event-more">
-                            +{events.length - WEEK_EVENT_LIMIT} more
-                          </div>
-                        ) : null}
                       </div>
-                    </div>
-                  );
-                })}
+                    ) : null}
+                  </div>
+                ))}
               </div>
             </div>
           ) : null}
@@ -1094,52 +1420,126 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="display__calendar-grid">
-                  {fourWeekCells.map((cell) => {
-                    const isToday = cell.key === todayKey;
-                    const isSelected = cell.key === selectedKey;
-                    const events = cell.events || [];
-                    return (
-                      <div
-                        key={cell.key}
-                        className={
-                          isToday
-                            ? "display__day display__day--today"
-                            : isSelected
-                              ? "display__day display__day--selected"
-                              : "display__day"
-                        }
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedDate(cell.date)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            setSelectedDate(cell.date);
-                          }
-                        }}
-                      >
-                        <div className="display__day-number">{cell.date.getDate()}</div>
-                        <div className="display__day-events">
-                          {events.slice(0, 3).map((event) => (
-                            <div key={event.id} className="display__event-chip">
-                              {renderEventDots(event)}
-                              <span className="display__event-chip-text">
-                                <span className="display__event-chip-time">
-                                  {formatEventTime(event, timeFormat)}
-                                </span>
-                                <span className="display__event-chip-title">{event.summary}</span>
-                              </span>
+                <div className="display__calendar-weeks">
+                  {fourWeekRows.map((week, weekIndex) => (
+                    <div
+                      key={`four-week-${weekIndex}`}
+                      className={`display__week-row${
+                        week.multiDayRows.length ? " display__week-row--has-multi" : ""
+                      }`}
+                      style={{
+                        "--multi-rows": week.multiDayRows.length,
+                        "--multi-gaps": Math.max(0, week.multiDayRows.length - 1)
+                      }}
+                    >
+                      <div className="display__calendar-grid display__week-days">
+                        {week.cells.map((cell) => {
+                          const isToday = cell.key === todayKey;
+                          const isSelected = cell.key === selectedKey;
+                          const events = (cell.events || []).filter(
+                            (event) => !isMultiDayEvent(event)
+                          );
+                          const visibleLimit = Math.max(0, 3 - week.multiDayRows.length);
+                          const visibleEvents = events.slice(0, visibleLimit);
+                          const hiddenCount = Math.max(0, events.length - visibleLimit);
+                          return (
+                            <div
+                              key={cell.key}
+                              className={
+                                isToday
+                                  ? "display__day display__day--today"
+                                  : isSelected
+                                    ? "display__day display__day--selected"
+                                    : "display__day"
+                              }
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setSelectedDate(cell.date)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  setSelectedDate(cell.date);
+                                }
+                              }}
+                            >
+                              <div className="display__day-number">{cell.date.getDate()}</div>
+                              <div className="display__day-events">
+                                {visibleEvents.map((event) => (
+                                  <div key={event.id} className="display__event-chip">
+                                    {renderEventDots(event)}
+                                    <span className="display__event-chip-text">
+                                      {!event.allDay && !isMultiDayEvent(event) ? (
+                                        <span className="display__event-chip-time">
+                                          {formatEventTime(event, timeFormat)}
+                                        </span>
+                                      ) : null}
+                                      <span className="display__event-chip-title">
+                                        {event.summary}
+                                      </span>
+                                    </span>
+                                  </div>
+                                ))}
+                                {hiddenCount > 0 ? (
+                                  <div className="display__event-more">
+                                    +{hiddenCount} more
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {week.multiDayRows.length ? (
+                        <div className="display__week-multi display__week-multi--lined">
+                          {week.multiDayRows.map((row, rowIndex) => (
+                            <div
+                              key={`four-week-${weekIndex}-row-${rowIndex}`}
+                              className="display__week-multi-row"
+                            >
+                              {row.map((segment) => {
+                                const event = segment.event;
+                                const showTime =
+                                  !event.allDay && !isMultiDayEvent(event);
+                                const timeLabel = showTime
+                                  ? formatEventRange(event, timeFormat)
+                                  : "";
+                                const className = [
+                                  "display__multi-event",
+                                  segment.startsBefore ? "display__multi-event--continued-start" : "",
+                                  segment.endsAfter ? "display__multi-event--continued-end" : ""
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ");
+                                return (
+                                  <button
+                                    type="button"
+                                    key={`${event.id || event.summary}-${weekIndex}-${segment.startIndex}-${segment.endIndex}`}
+                                    className={className}
+                                    style={{
+                                      gridColumn: `${segment.startIndex + 1} / ${segment.endIndex + 2}`,
+                                      borderLeftColor: getEventPrimaryColor(event) || event.calendarColor
+                                    }}
+                                    onClick={() => setActiveEvent(event)}
+                                  >
+                                    {renderEventDots(event)}
+                                    <span className="display__multi-event-text">
+                                      <span className="display__multi-event-title">
+                                        {event.summary}
+                                      </span>
+                                      {timeLabel ? (
+                                        <span className="display__multi-event-time">
+                                          {timeLabel}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           ))}
-                          {events.length > 3 ? (
-                            <div className="display__event-more">
-                              +{events.length - 3} more
-                            </div>
-                          ) : null}
                         </div>
-                      </div>
-                    );
-                  })}
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1149,6 +1549,8 @@ export default function App() {
               {upcomingEvents.length ? (
                 upcomingEvents.map((event) => {
                   const meta = getUpcomingDateParts(event, timeFormat);
+                  const showTime = !event.allDay && !isMultiDayEvent(event);
+                  const upcomingLabel = showTime ? meta.timeLabel : formatUpcomingRange(event);
                   return (
                     <div
                       key={event.id}
@@ -1173,7 +1575,9 @@ export default function App() {
                           <span className="display__event-title">{event.summary}</span>
                           {renderEventDots(event)}
                         </div>
-                        <span className="display__event-time">{meta.timeLabel}</span>
+                        {upcomingLabel ? (
+                          <span className="display__event-time">{upcomingLabel}</span>
+                        ) : null}
                       </div>
                     </div>
                   );

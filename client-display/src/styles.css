@@ -305,6 +305,142 @@ body {
   min-height: 0;
 }
 
+.display__calendar-weeks {
+  display: grid;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.display__week-row {
+  display: grid;
+  gap: 6px;
+  position: relative;
+  --multi-offset: 36px;
+  --multi-rows: 0;
+  --multi-gaps: 0;
+  --multi-row-height: 26px;
+  --multi-gap: 6px;
+}
+
+.display__week-multi {
+  position: absolute;
+  top: var(--multi-offset);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.display__week-multi--lined .display__multi-event {
+  border-left: none;
+  padding-left: 8px;
+}
+
+.display__week-multi--lined .display__event-dot-group {
+  align-self: stretch;
+  align-items: stretch;
+}
+
+.display__week-multi--lined .display__event-dot {
+  width: 3px;
+  height: auto;
+  border-radius: 2px;
+  align-self: stretch;
+  margin: 2px 0;
+}
+
+.display__week-multi--curved .display__event-dot-group {
+  display: none;
+}
+
+.display__week-multi--curved .display__multi-event {
+  margin-left: 8px;
+}
+
+.display__week-multi-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.display__week-days {
+  align-items: stretch;
+  position: relative;
+  z-index: 0;
+}
+
+.display__week-row--has-multi .display__day-events {
+  margin-top: calc(
+    var(--multi-rows) * var(--multi-row-height) +
+      var(--multi-gaps) * var(--multi-gap) +
+      6px
+  );
+}
+
+.display__week-row--has-multi .display__day--week .display__day-events {
+  margin-top: calc(
+    var(--multi-rows) * var(--multi-row-height) +
+      var(--multi-gaps) * var(--multi-gap) +
+      8px
+  );
+}
+
+.display__multi-event {
+  border-radius: 12px;
+  border: 1px solid rgba(31, 31, 31, 0.06);
+  border-left: 4px solid var(--accent);
+  background: rgba(255, 255, 255, 0.85);
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  pointer-events: auto;
+}
+
+.display__multi-event-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.display__multi-event-title {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.display__multi-event-time {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.display__multi-event--continued-start::before {
+  content: "<";
+  font-size: 10px;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.display__multi-event--continued-end::after {
+  content: ">";
+  font-size: 10px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
 .display__week {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -769,6 +905,10 @@ body {
   .display__time {
     font-size: 48px;
   }
+
+  .display__week-row {
+    --multi-offset: 30px;
+  }
 }
 
 @media (orientation: portrait) {
@@ -854,6 +994,10 @@ body {
   .display__panel--day {
     height: auto;
     align-self: flex-start;
+  }
+
+  .display__week-row {
+    --multi-offset: 34px;
   }
 }
 
@@ -970,8 +1114,30 @@ body {
 
   .display__calendar-header,
   .display__calendar-grid,
-  .display__week-grid {
+  .display__week-grid,
+  .display__week-multi-row {
     gap: 6px;
+  }
+
+  .display__calendar-weeks {
+    gap: 8px;
+  }
+
+  .display__week-row,
+  .display__week-multi {
+    gap: 4px;
+  }
+
+  .display__multi-event {
+    padding: 4px 6px;
+  }
+
+  .display__multi-event-title {
+    font-size: 11px;
+  }
+
+  .display__multi-event-time {
+    font-size: 9px;
   }
 
   .display__day {
@@ -1027,6 +1193,10 @@ body {
 
   .display__day-events .display__event-chip:nth-of-type(n + 3) {
     display: none;
+  }
+
+  .display__week-row {
+    --multi-offset: 28px;
   }
 }
 
