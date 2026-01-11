@@ -534,9 +534,10 @@ body {
 }
 
 .display__day-events {
-  margin-top: auto;
+  margin-top: 8px;
   display: grid;
   gap: 6px;
+  align-content: start;
 }
 
 .display__day--week .display__day-events {
