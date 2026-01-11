@@ -26,13 +26,13 @@ const formatTime = (date, timeFormat) =>
     hour12: timeFormat !== "24h"
   });
 
-const formatDate = (date) =>
-  date.toLocaleDateString([], {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  });
+const formatDate = (date, style = "long") =>
+  date.toLocaleDateString(
+    [],
+    style === "short"
+      ? { weekday: "short", month: "short", day: "numeric" }
+      : { weekday: "long", month: "long", day: "numeric", year: "numeric" }
+  );
 
 const formatMonthLabel = (date) =>
   date.toLocaleDateString([], { month: "long", year: "numeric" });
@@ -303,6 +303,7 @@ export default function App() {
   const [rangeRequest, setRangeRequest] = useState(null);
   const [timeOffsetMs, setTimeOffsetMs] = useState(0);
   const [activeEvent, setActiveEvent] = useState(null);
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const handleViewChange = (nextView) => {
     setView(nextView);
     if (nextView === "month") {
@@ -339,6 +340,14 @@ export default function App() {
     const timer = setInterval(updateNow, 1000 * 30);
     return () => clearInterval(timer);
   }, [timeOffsetMs]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -504,6 +513,9 @@ export default function App() {
       : null;
   const weatherDescription = weather?.current?.description || "";
   const weatherLocationName = weather?.location?.name || weatherLocation;
+  const isCompactHeader = viewportWidth <= 1200;
+  const dateLabel = formatDate(now, isCompactHeader ? "short" : "long");
+  const forecastDays = viewportWidth <= 1000 ? 5 : 7;
 
   const sanitizeDescription = (value = "") => {
     if (!value) {
@@ -994,9 +1006,11 @@ export default function App() {
   return (
     <main className="display">
       <header className="display__header">
-        <div>
-          <p className="display__date">{formatDate(now)}</p>
-          <p className="display__time">{formatTime(now, timeFormat)}</p>
+        <div className="display__date-time">
+          <div className="display__date-time-main">
+            <p className="display__date">{dateLabel}</p>
+            <p className="display__time">{formatTime(now, timeFormat)}</p>
+          </div>
           {error ? <p className="display__subtle">{error}</p> : null}
           {refreshError ? <p className="display__subtle">{refreshError}</p> : null}
         </div>
@@ -1014,8 +1028,11 @@ export default function App() {
             )}
           </div>
           {weather?.forecast?.length ? (
-            <div className="display__forecast">
-              {weather.forecast.slice(0, 7).map((day) => {
+            <div
+              className="display__forecast"
+              style={{ "--forecast-columns": forecastDays }}
+            >
+              {weather.forecast.slice(0, forecastDays).map((day) => {
                 const date = day.date ? new Date(`${day.date}T00:00:00`) : null;
                 const dayLabel =
                   date && !Number.isNaN(date.getTime())
