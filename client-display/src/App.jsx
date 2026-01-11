@@ -55,6 +55,97 @@ const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const getMinutesIntoDay = (date) => date.getHours() * 60 + date.getMinutes();
 
+const normalizeMergeValue = (value) => (value ? String(value) : "");
+
+const buildMergeKey = (event) => {
+  if (!event) {
+    return "";
+  }
+  return [
+    normalizeMergeValue(event.summary),
+    normalizeMergeValue(event.start),
+    normalizeMergeValue(event.end),
+    event.allDay ? "1" : "0",
+    normalizeMergeValue(event.location)
+  ].join("||");
+};
+
+const mergeCalendarEvents = (events) => {
+  const merged = new Map();
+  for (const event of events) {
+    if (!event) {
+      continue;
+    }
+    const key = buildMergeKey(event);
+    const existing = merged.get(key);
+    if (!existing) {
+      const calendarColors = [];
+      const calendarLabels = [];
+      const calendarIds = [];
+      if (event.calendarColor) {
+        calendarColors.push(event.calendarColor);
+      }
+      if (event.calendarLabel) {
+        calendarLabels.push(event.calendarLabel);
+      }
+      if (event.calendarId) {
+        calendarIds.push(event.calendarId);
+      }
+      merged.set(key, {
+        ...event,
+        calendarColors,
+        calendarLabels,
+        calendarIds
+      });
+      continue;
+    }
+    if (
+      event.calendarId &&
+      Array.isArray(existing.calendarIds) &&
+      existing.calendarIds.includes(event.calendarId)
+    ) {
+      const fallbackKey = `${key}||${event.id || existing.calendarIds.length}`;
+      merged.set(fallbackKey, {
+        ...event,
+        calendarColors: event.calendarColor ? [event.calendarColor] : [],
+        calendarLabels: event.calendarLabel ? [event.calendarLabel] : [],
+        calendarIds: event.calendarId ? [event.calendarId] : []
+      });
+      continue;
+    }
+    if (event.calendarColor && !existing.calendarColors.includes(event.calendarColor)) {
+      existing.calendarColors.push(event.calendarColor);
+    }
+    if (event.calendarLabel && !existing.calendarLabels.includes(event.calendarLabel)) {
+      existing.calendarLabels.push(event.calendarLabel);
+    }
+    if (event.calendarId && !existing.calendarIds.includes(event.calendarId)) {
+      existing.calendarIds.push(event.calendarId);
+    }
+  }
+  return Array.from(merged.values());
+};
+
+const getEventCalendarColors = (event) => {
+  const colors = Array.isArray(event?.calendarColors)
+    ? event.calendarColors.filter(Boolean)
+    : [];
+  if (!colors.length && event?.calendarColor) {
+    return [event.calendarColor];
+  }
+  return colors;
+};
+
+const getEventCalendarLabels = (event) => {
+  const labels = Array.isArray(event?.calendarLabels)
+    ? event.calendarLabels.filter(Boolean)
+    : [];
+  if (!labels.length && event?.calendarLabel) {
+    return [event.calendarLabel];
+  }
+  return labels;
+};
+
 const getForecastBadge = (description = "") => {
   const text = description.toLowerCase();
   if (text.includes("thunder") || text.includes("storm")) {
@@ -250,6 +341,7 @@ export default function App() {
   }, [config]);
 
   const timeFormat = config?.display?.timeFormat || "12h";
+  const mergeCalendars = config?.display?.mergeCalendars ?? true;
   const defaultView = viewLabels[config?.display?.defaultView]
     ? config.display.defaultView
     : "month";
@@ -353,6 +445,26 @@ export default function App() {
     return `${startDateLabel} · ${timeLabel}`;
   };
 
+  const renderEventDots = (event) => {
+    const colors = getEventCalendarColors(event);
+    if (!colors.length) {
+      return null;
+    }
+    return (
+      <span className="display__event-dot-group">
+        {colors.map((color, index) => (
+          <span
+            key={`${color}-${index}`}
+            className="display__event-dot"
+            style={{ backgroundColor: color }}
+          />
+        ))}
+      </span>
+    );
+  };
+
+  const getEventPrimaryColor = (event) => getEventCalendarColors(event)[0];
+
   const meetingLinks = useMemo(
     () => (activeEvent ? extractMeetingLinks(activeEvent) : []),
     [activeEvent]
@@ -361,11 +473,18 @@ export default function App() {
     () => (activeEvent ? sanitizeDescription(activeEvent.description) : ""),
     [activeEvent]
   );
+  const activeEventLabels = useMemo(
+    () => (activeEvent ? getEventCalendarLabels(activeEvent) : []),
+    [activeEvent]
+  );
+  const activeEventLabel =
+    activeEventLabels.length > 0 ? activeEventLabels.join(", ") : "Calendar";
 
   const sortedEvents = useMemo(() => {
     const events = eventsCache?.events || [];
-    return [...events].sort((a, b) => getEventStartMs(a) - getEventStartMs(b));
-  }, [eventsCache]);
+    const normalized = mergeCalendars ? mergeCalendarEvents(events) : [...events];
+    return normalized.sort((a, b) => getEventStartMs(a) - getEventStartMs(b));
+  }, [eventsCache, mergeCalendars]);
 
   const activeMonthDate = useMemo(
     () => new Date(now.getFullYear(), now.getMonth() + monthOffset, 1),
@@ -827,10 +946,7 @@ export default function App() {
                         <div className="display__day-events">
                           {events.slice(0, 3).map((event) => (
                             <div key={event.id} className="display__event-chip">
-                              <span
-                                className="display__event-dot"
-                                style={{ backgroundColor: event.calendarColor }}
-                              />
+                              {renderEventDots(event)}
                               <span className="display__event-chip-text">
                                 <span className="display__event-chip-time">
                                   {formatEventTime(event, timeFormat)}
@@ -889,7 +1005,7 @@ export default function App() {
                           <div
                             key={event.id}
                             className="display__week-event"
-                            style={{ borderLeftColor: event.calendarColor }}
+                            style={{ borderLeftColor: getEventPrimaryColor(event) || event.calendarColor }}
                           >
                             <span className="display__week-event-time">
                               {formatEventRange(event, timeFormat)}
@@ -947,10 +1063,7 @@ export default function App() {
                         <div className="display__day-events">
                           {events.slice(0, 3).map((event) => (
                             <div key={event.id} className="display__event-chip">
-                              <span
-                                className="display__event-dot"
-                                style={{ backgroundColor: event.calendarColor }}
-                              />
+                              {renderEventDots(event)}
                               <span className="display__event-chip-text">
                                 <span className="display__event-chip-time">
                                   {formatEventTime(event, timeFormat)}
@@ -981,7 +1094,7 @@ export default function App() {
                     <div
                       key={event.id}
                       className="display__event-card"
-                      style={{ borderLeftColor: event.calendarColor }}
+                      style={{ borderLeftColor: getEventPrimaryColor(event) || event.calendarColor }}
                       role="button"
                       tabIndex={0}
                       onClick={() => setActiveEvent(event)}
@@ -999,10 +1112,7 @@ export default function App() {
                       <div className="display__event-details">
                         <div className="display__event-title-row">
                           <span className="display__event-title">{event.summary}</span>
-                          <span
-                            className="display__event-dot"
-                            style={{ backgroundColor: event.calendarColor }}
-                          />
+                          {renderEventDots(event)}
                         </div>
                         <span className="display__event-time">{meta.timeLabel}</span>
                       </div>
@@ -1032,7 +1142,7 @@ export default function App() {
                       type="button"
                       key={event.id}
                       className="display__all-day-chip"
-                      style={{ borderLeftColor: event.calendarColor }}
+                      style={{ borderLeftColor: getEventPrimaryColor(event) || event.calendarColor }}
                       onClick={() => setActiveEvent(event)}
                     >
                       {event.summary}
@@ -1048,7 +1158,7 @@ export default function App() {
                   className="display__daily-event"
                   style={{
                     height: `${event.slotCount * DAILY_SLOT_HEIGHT}px`,
-                    borderLeftColor: event.calendarColor
+                    borderLeftColor: getEventPrimaryColor(event) || event.calendarColor
                   }}
                   role="button"
                   tabIndex={0}
@@ -1091,13 +1201,8 @@ export default function App() {
                 </button>
               </div>
               <div className="display__modal-meta">
-                <span
-                  className="display__modal-color"
-                  style={{ backgroundColor: activeEvent.calendarColor }}
-                />
-                <span className="display__modal-label">
-                  {activeEvent.calendarLabel || "Calendar"}
-                </span>
+                {renderEventDots(activeEvent)}
+                <span className="display__modal-label">{activeEventLabel}</span>
               </div>
               {activeEvent.location ? (
                 <div className="display__modal-block">

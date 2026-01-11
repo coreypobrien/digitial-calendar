@@ -54,6 +54,12 @@ const normalizeConfig = (config) => {
       resetMinutes: defaultConfig.display.resetMinutes
     };
   }
+  if (next.display?.mergeCalendars === undefined) {
+    next.display = {
+      ...next.display,
+      mergeCalendars: defaultConfig.display.mergeCalendars
+    };
+  }
   next.weather = {
     ...next.weather,
     provider: "weathergov",

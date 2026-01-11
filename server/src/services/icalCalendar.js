@@ -108,6 +108,7 @@ export const normalizeIcalFeeds = (feeds = []) =>
     .map((feed) => ({
       url: typeof feed?.url === "string" ? feed.url.trim() : "",
       label: typeof feed?.label === "string" ? feed.label.trim() : "",
+      color: typeof feed?.color === "string" ? feed.color.trim() : "",
       enabled: feed?.enabled ?? true
     }))
     .filter((feed) => feed.enabled && feed.url);
@@ -264,7 +265,7 @@ export const syncIcalEvents = async ({ timeMin, timeMax, feeds } = {}) => {
       const calendarMeta = {
         id: feed.url,
         label,
-        color: DEFAULT_COLOR
+        color: feed.color || DEFAULT_COLOR
       };
       events.push(...extractEvents(data, calendarMeta, rangeStart, rangeEnd));
     } catch (error) {

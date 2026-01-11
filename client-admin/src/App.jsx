@@ -341,11 +341,12 @@ export default function App() {
         return prev;
       }
       const feeds = prev.ical?.feeds || [];
+      const accent = prev.display?.theme?.accent || "#315a4a";
       return {
         ...prev,
         ical: {
           ...prev.ical,
-          feeds: [...feeds, { url: "", label: "", enabled: true }]
+          feeds: [...feeds, { url: "", label: "", enabled: true, color: accent }]
         }
       };
     });
@@ -612,6 +613,25 @@ export default function App() {
                         }
                       />
                     </label>
+                    <div className="admin__field">
+                      Merge duplicate events
+                      <label className="admin__checkbox">
+                        <input
+                          type="checkbox"
+                          checked={config.display.mergeCalendars ?? true}
+                          onChange={(event) =>
+                            updateConfig((prev) => ({
+                              ...prev,
+                              display: {
+                                ...prev.display,
+                                mergeCalendars: event.target.checked
+                              }
+                            }))
+                          }
+                        />
+                        Combine matching events across calendars
+                      </label>
+                    </div>
                     <label className="admin__field">
                       Background color
                       <input
@@ -860,6 +880,16 @@ export default function App() {
                               placeholder="Family Calendar"
                               onChange={(event) =>
                                 updateIcalFeed(index, { label: event.target.value })
+                              }
+                            />
+                          </label>
+                          <label className="admin__field">
+                            Color
+                            <input
+                              type="color"
+                              value={feed.color ?? config.display.theme.accent}
+                              onChange={(event) =>
+                                updateIcalFeed(index, { color: event.target.value })
                               }
                             />
                           </label>

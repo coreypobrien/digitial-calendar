@@ -16,7 +16,8 @@ export const CalendarSourceSchema = z.object({
 export const IcalFeedSchema = z.object({
   url: z.string().url(),
   label: z.string(),
-  enabled: z.boolean()
+  enabled: z.boolean(),
+  color: z.string().optional()
 });
 
 export const ConfigSchema = z.object({
@@ -29,7 +30,8 @@ export const ConfigSchema = z.object({
     defaultView: z.enum(["month", "fourWeek", "week", "activity", "chores"]),
     timeFormat: z.enum(["12h", "24h"]),
     theme: ThemeSchema,
-    resetMinutes: z.number().int().min(0).max(1440)
+    resetMinutes: z.number().int().min(0).max(1440),
+    mergeCalendars: z.boolean()
   }),
   refresh: z.object({
     calendarMinutes: z.number().int().min(1),

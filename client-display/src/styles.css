@@ -433,6 +433,18 @@ body {
   border-radius: 999px;
 }
 
+.display__event-dot-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.display__event-chip .display__event-dot-group {
+  align-self: stretch;
+  align-items: stretch;
+}
+
 .display__event-chip .display__event-dot {
   width: 3px;
   height: auto;
