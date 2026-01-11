@@ -882,7 +882,7 @@ export default function App() {
         const endDate = new Date(endMs);
         const startMinutes = getMinutesIntoDay(startDate);
         const endMinutes = getMinutesIntoDay(endDate);
-        if (endMinutes <= rangeStart || startMinutes >= rangeEnd) {
+        if (endMinutes <= rangeStart || startMinutes > rangeEnd) {
           return null;
         }
         const clampedStart = Math.max(startMinutes, rangeStart);
