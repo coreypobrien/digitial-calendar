@@ -756,16 +756,16 @@ export default function App() {
                 <button
                   type="button"
                   className="display__nav-button"
-                  onClick={() => shiftWeek(-1, 4)}
-                  aria-label="Previous 4 weeks"
+                  onClick={() => shiftWeek(-1)}
+                  aria-label="Previous week"
                 >
                   &lt;
                 </button>
                 <button
                   type="button"
                   className="display__nav-button"
-                  onClick={() => shiftWeek(1, 4)}
-                  aria-label="Next 4 weeks"
+                  onClick={() => shiftWeek(1)}
+                  aria-label="Next week"
                 >
                   &gt;
                 </button>
