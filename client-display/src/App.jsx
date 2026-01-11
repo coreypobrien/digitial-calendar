@@ -90,6 +90,8 @@ export default function App() {
   const [weather, setWeather] = useState(null);
   const [weatherError, setWeatherError] = useState("");
   const [eventsCache, setEventsCache] = useState({ events: [], updatedAt: null });
+  const [refreshError, setRefreshError] = useState("");
+  const [isRefreshingEvents, setIsRefreshingEvents] = useState(false);
   const [view, setView] = useState("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [monthOffset, setMonthOffset] = useState(0);
@@ -237,6 +239,24 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  const handleRefreshEvents = async () => {
+    setIsRefreshingEvents(true);
+    setRefreshError("");
+    try {
+      const response = await fetch("/api/events/refresh", { method: "POST" });
+      const data = await response.json();
+      if (response.ok) {
+        setEventsCache(data);
+      } else {
+        setRefreshError(data.error || "Unable to refresh events.");
+      }
+    } catch (_error) {
+      setRefreshError("Unable to refresh events.");
+    } finally {
+      setIsRefreshingEvents(false);
+    }
+  };
 
   useEffect(() => {
     if (!config?.display?.theme) {
@@ -656,6 +676,7 @@ export default function App() {
           <p className="display__date">{formatDate(now)}</p>
           <p className="display__time">{formatTime(now, timeFormat)}</p>
           {error ? <p className="display__subtle">{error}</p> : null}
+          {refreshError ? <p className="display__subtle">{refreshError}</p> : null}
         </div>
         <div className="display__weather">
           <div className="display__weather-main">
@@ -784,6 +805,16 @@ export default function App() {
                   {viewLabels[key].replace(" View", "")}
                 </button>
               ))}
+              <button
+                type="button"
+                className="display__refresh-button"
+                onClick={handleRefreshEvents}
+                disabled={isRefreshingEvents}
+                aria-label="Refresh events"
+                title="Refresh events"
+              >
+                ↻
+              </button>
             </div>
           </div>
           {view === "month" ? (

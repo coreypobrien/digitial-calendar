@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import { syncCalendarEvents } from "../services/calendarSync.js";
 import { loadConfig, saveConfig } from "../storage/configStore.js";
-import { loadEventCache } from "../storage/eventStore.js";
+import { loadEventCache, saveEventCache } from "../storage/eventStore.js";
 
 const router = Router();
 
@@ -76,6 +76,21 @@ router.post("/extend", async (req, res, next) => {
       throw error;
     }
   } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/refresh", async (_req, res, next) => {
+  try {
+    await saveEventCache({ updatedAt: null, range: null, events: [] });
+    await syncCalendarEvents();
+    const cache = await loadEventCache();
+    res.json(cache);
+  } catch (error) {
+    if (error?.code === "NO_SOURCES") {
+      res.status(409).json({ error: "No calendar sources configured" });
+      return;
+    }
     next(error);
   }
 });
