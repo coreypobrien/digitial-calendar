@@ -53,6 +53,13 @@ const formatWeekLabel = (start, end) => {
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const getWeekStart = (date) => {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+};
+
 const getMinutesIntoDay = (date) => date.getHours() * 60 + date.getMinutes();
 
 const normalizeMergeValue = (value) => (value ? String(value) : "");
@@ -185,6 +192,9 @@ export default function App() {
   const [isRefreshingEvents, setIsRefreshingEvents] = useState(false);
   const [view, setView] = useState("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [fourWeekAnchorDate, setFourWeekAnchorDate] = useState(() =>
+    getWeekStart(new Date())
+  );
   const [monthOffset, setMonthOffset] = useState(0);
   const [rangeRequest, setRangeRequest] = useState(null);
   const [timeOffsetMs, setTimeOffsetMs] = useState(0);
@@ -197,6 +207,9 @@ export default function App() {
         (selectedDate.getMonth() - now.getMonth());
       setMonthOffset(monthDiff);
     }
+    if (nextView === "fourWeek") {
+      setFourWeekAnchorDate(getWeekStart(selectedDate));
+    }
   };
   const shiftWeek = (direction, weekCount = 1) => {
     setSelectedDate((prev) => {
@@ -204,6 +217,14 @@ export default function App() {
       next.setDate(next.getDate() + direction * 7 * weekCount);
       return next;
     });
+    if (view === "fourWeek") {
+      setFourWeekAnchorDate((prev) => {
+        const base = prev || getWeekStart(selectedDate);
+        const next = new Date(base);
+        next.setDate(next.getDate() + direction * 7 * weekCount);
+        return next;
+      });
+    }
   };
 
   useEffect(() => {
@@ -512,11 +533,9 @@ export default function App() {
   );
 
   const weekStartDate = useMemo(() => {
-    const start = new Date(selectedDate);
-    start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - start.getDay());
-    return start;
-  }, [selectedDate]);
+    const baseDate = view === "fourWeek" ? fourWeekAnchorDate : selectedDate;
+    return getWeekStart(baseDate);
+  }, [fourWeekAnchorDate, selectedDate, view]);
 
   const weekEndDate = useMemo(() => {
     const end = new Date(weekStartDate);
@@ -642,6 +661,15 @@ export default function App() {
       );
     }
   }, [activeMonthDate, selectedDate, view]);
+
+  useEffect(() => {
+    if (view !== "fourWeek") {
+      return;
+    }
+    if (selectedDate < weekStartDate || selectedDate > fourWeekEndDate) {
+      setFourWeekAnchorDate(getWeekStart(selectedDate));
+    }
+  }, [fourWeekEndDate, selectedDate, view, weekStartDate]);
 
   useEffect(() => {
     if (view !== "month" && view !== "week" && view !== "fourWeek") {
