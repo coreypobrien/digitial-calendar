@@ -646,6 +646,20 @@ body {
   color: var(--muted);
 }
 
+.display__event-measure {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+}
+
+.display__event-measure-day {
+  width: var(--measure-day-width, 200px);
+}
+
 .display__list {
   margin-top: 0;
   display: grid;
@@ -1194,7 +1208,6 @@ body {
     min-height: 62px;
     padding: 6px;
     border-radius: 12px;
-    overflow: hidden;
   }
 
   .display__day-label {
@@ -1203,7 +1216,6 @@ body {
 
   .display__day-events {
     gap: 4px;
-    overflow: hidden;
   }
 
   .display__event-chip {
@@ -1239,10 +1251,6 @@ body {
 
   .display__muted {
     font-size: 12px;
-  }
-
-  .display__day-events .display__event-chip:nth-of-type(n + 3) {
-    display: none;
   }
 
   .display__week-row {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ChoreView from "./components/ChoreView.jsx";
 
 import {
@@ -73,6 +73,123 @@ const getDayEndMs = (date) => {
   const end = new Date(date);
   end.setHours(23, 59, 59, 999);
   return end.getTime();
+};
+
+const parsePx = (value) => {
+  if (typeof value !== "string") {
+    return 0;
+  }
+  const parsed = Number.parseFloat(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const getDayEventLimitDebug = (rowCount, multiDayRowCount, isNarrowPortrait) => {
+  const baseLimit = rowCount <= 4 ? 4 : 3;
+  const rawLimit = Math.max(0, baseLimit - multiDayRowCount);
+  const portraitClamp = isNarrowPortrait && rawLimit > 2;
+  const visibleLimit = portraitClamp ? 2 : rawLimit;
+  return {
+    baseLimit,
+    rawLimit,
+    portraitClamp,
+    visibleLimit,
+    reason: portraitClamp ? "portrait clamp to 2" : "baseLimit - multiDayRows"
+  };
+};
+
+const getDayEventLimit = (
+  rowCount,
+  multiDayRowCount,
+  isNarrowPortrait,
+  measuredCapacity
+) => {
+  const baseLimit = rowCount <= 4 ? 4 : 3;
+  const rawLimit = Math.max(0, baseLimit - multiDayRowCount);
+  if (typeof measuredCapacity === "number" && measuredCapacity >= 0) {
+    return Math.min(rawLimit, measuredCapacity);
+  }
+  return isNarrowPortrait && rawLimit > 2 ? 2 : rawLimit;
+};
+
+const measureDayCapacities = (container, measureContainer) => {
+  if (!container) {
+    return { capacities: {}, dayWidth: null };
+  }
+  const nextCapacities = {};
+  let dayWidth = null;
+  const dayCells = container.querySelectorAll(".display__day[data-day-key]");
+  dayCells.forEach((day) => {
+    const key = day.dataset.dayKey;
+    const events = day.querySelector(".display__day-events");
+    if (!key || !events) {
+      return;
+    }
+    if (dayWidth === null) {
+      dayWidth = day.getBoundingClientRect().width;
+    }
+    const measureDay = measureContainer?.querySelector(
+      `.display__event-measure-day[data-day-key="${key}"]`
+    );
+    const chips = measureDay
+      ? Array.from(measureDay.querySelectorAll(".display__event-chip"))
+      : Array.from(events.querySelectorAll(".display__event-chip"));
+    if (!chips.length) {
+      nextCapacities[key] = 0;
+      return;
+    }
+    const dayRect = day.getBoundingClientRect();
+    const eventsRect = events.getBoundingClientRect();
+    const dayStyles = window.getComputedStyle(day);
+    const eventsStyles = window.getComputedStyle(events);
+    const dayNumberEl = day.querySelector(".display__day-number");
+    const dayNumberRect = dayNumberEl?.getBoundingClientRect();
+    const paddingBottom = parsePx(dayStyles.paddingBottom);
+    const paddingTop = parsePx(dayStyles.paddingTop);
+    const dayGap = parsePx(dayStyles.rowGap || dayStyles.gap);
+    const eventsGap = parsePx(eventsStyles.rowGap || eventsStyles.gap);
+    const eventsMarginTop = parsePx(eventsStyles.marginTop);
+    const multiRows = Number.parseInt(day.dataset.multiRows || "0", 10);
+    const fixedMarginTop = multiRows > 0 ? eventsMarginTop : 0;
+    const dayNumberHeight = dayNumberRect?.height ?? 0;
+    const availableHeight =
+      dayRect.height -
+      paddingTop -
+      paddingBottom -
+      dayNumberHeight -
+      dayGap -
+      fixedMarginTop;
+    const availableHeightUsed = Math.max(0, availableHeight);
+    const chipHeights = chips.map((chip) => chip.getBoundingClientRect().height);
+    if (!chipHeights.length || availableHeightUsed <= 0) {
+      nextCapacities[key] = 0;
+      return;
+    }
+    let used = 0;
+    let capacity = 0;
+    for (const height of chipHeights) {
+      const nextUsed = used === 0 ? height : used + eventsGap + height;
+      if (nextUsed <= availableHeightUsed) {
+        used = nextUsed;
+        capacity += 1;
+      } else {
+        break;
+      }
+    }
+    nextCapacities[key] = Math.max(0, capacity);
+  });
+  return { capacities: nextCapacities, dayWidth };
+};
+
+const areCapacityMapsEqual = (left, right) => {
+  if (left === right) {
+    return true;
+  }
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  return leftKeys.every((key) => left[key] === right[key]);
 };
 
 const normalizeMergeValue = (value) => (value ? String(value) : "");
@@ -173,6 +290,8 @@ const chunkArray = (items, size) => {
   }
   return chunks;
 };
+
+ 
 
 const buildMultiDayRows = (weekDates, events) => {
   const dateKeys = weekDates.map((date) => (date ? toLocalDateKey(date) : null));
@@ -303,7 +422,18 @@ export default function App() {
   const [rangeRequest, setRangeRequest] = useState(null);
   const [timeOffsetMs, setTimeOffsetMs] = useState(0);
   const [activeEvent, setActiveEvent] = useState(null);
-  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight
+  }));
+  const monthWeeksRef = useRef(null);
+  const fourWeekWeeksRef = useRef(null);
+  const monthMeasureRef = useRef(null);
+  const fourWeekMeasureRef = useRef(null);
+  const [monthCapacities, setMonthCapacities] = useState({});
+  const [fourWeekCapacities, setFourWeekCapacities] = useState({});
+  const [monthMeasureWidth, setMonthMeasureWidth] = useState(null);
+  const [fourWeekMeasureWidth, setFourWeekMeasureWidth] = useState(null);
   const handleViewChange = (nextView) => {
     setView(nextView);
     if (nextView === "month") {
@@ -343,7 +473,7 @@ export default function App() {
 
   useEffect(() => {
     const handleResize = () => {
-      setViewportWidth(window.innerWidth);
+      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -513,9 +643,18 @@ export default function App() {
       : null;
   const weatherDescription = weather?.current?.description || "";
   const weatherLocationName = weather?.location?.name || weatherLocation;
+  const viewportWidth = viewportSize.width;
   const isCompactHeader = viewportWidth <= 1200;
+  const isNarrowPortrait =
+    viewportSize.height >= viewportSize.width && viewportWidth <= 1200;
   const dateLabel = formatDate(now, isCompactHeader ? "short" : "long");
   const forecastDays = viewportWidth <= 1000 ? 5 : 7;
+  const debugEvents = useMemo(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return new URLSearchParams(window.location.search).has("debugEvents");
+  }, []);
 
   const sanitizeDescription = (value = "") => {
     if (!value) {
@@ -1002,6 +1141,368 @@ export default function App() {
     ],
     [weekCells, sortedEvents]
   );
+  const monthRowCount = monthWeekRows.length;
+  const fourWeekRowCount = fourWeekRows.length;
+
+  useLayoutEffect(() => {
+    if (view !== "month") {
+      return;
+    }
+    const container = monthWeeksRef.current;
+    if (!container) {
+      return;
+    }
+    const updateCapacities = () => {
+      const { capacities: nextCapacities, dayWidth } = measureDayCapacities(
+        container,
+        monthMeasureRef.current
+      );
+      setMonthCapacities((prev) =>
+        areCapacityMapsEqual(prev, nextCapacities) ? prev : nextCapacities
+      );
+      if (dayWidth && dayWidth !== monthMeasureWidth) {
+        setMonthMeasureWidth(dayWidth);
+      }
+    };
+    updateCapacities();
+    const observer = new ResizeObserver(updateCapacities);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [view, monthWeekRows, viewportSize.width, viewportSize.height, monthMeasureWidth]);
+
+  useLayoutEffect(() => {
+    if (view !== "fourWeek") {
+      return;
+    }
+    const container = fourWeekWeeksRef.current;
+    if (!container) {
+      return;
+    }
+    const updateCapacities = () => {
+      const { capacities: nextCapacities, dayWidth } = measureDayCapacities(
+        container,
+        fourWeekMeasureRef.current
+      );
+      setFourWeekCapacities((prev) =>
+        areCapacityMapsEqual(prev, nextCapacities) ? prev : nextCapacities
+      );
+      if (dayWidth && dayWidth !== fourWeekMeasureWidth) {
+        setFourWeekMeasureWidth(dayWidth);
+      }
+    };
+    updateCapacities();
+    const observer = new ResizeObserver(updateCapacities);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [view, fourWeekRows, viewportSize.width, viewportSize.height, fourWeekMeasureWidth]);
+
+  useEffect(() => {
+    if (!debugEvents) {
+      return;
+    }
+    if (view === "month") {
+      const hiddenDays = [];
+      monthWeekRows.forEach((week) => {
+        week.cells.forEach((cell) => {
+          if (!cell.day) {
+            return;
+          }
+          const events = (cell.events || []).filter(
+            (event) => !isMultiDayEvent(event)
+          );
+          const limitDetails = getDayEventLimitDebug(
+            monthRowCount,
+            week.multiDayRows.length,
+            isNarrowPortrait
+          );
+          const measuredCapacity = monthCapacities[cell.key];
+          const visibleLimit = getDayEventLimit(
+            monthRowCount,
+            week.multiDayRows.length,
+            isNarrowPortrait,
+            measuredCapacity
+          );
+          const hiddenCount = Math.max(0, events.length - visibleLimit);
+          if (hiddenCount > 0) {
+            const limitSource =
+              typeof measuredCapacity === "number"
+                ? "measured capacity"
+                : limitDetails.portraitClamp
+                  ? "portrait clamp"
+                  : "baseLimit - multiDayRows";
+            const dayEl = document.querySelector(
+              `.display__day[data-day-key="${cell.key}"]`
+            );
+            const eventsEl = dayEl?.querySelector(".display__day-events");
+            const dayRect = dayEl?.getBoundingClientRect();
+            const eventsRect = eventsEl?.getBoundingClientRect();
+            const dayStyles = dayEl ? window.getComputedStyle(dayEl) : null;
+            const eventsStyles = eventsEl ? window.getComputedStyle(eventsEl) : null;
+            const dayNumberEl = dayEl?.querySelector(".display__day-number");
+            const dayNumberRect = dayNumberEl?.getBoundingClientRect();
+            const dayNumberStyles = dayNumberEl
+              ? window.getComputedStyle(dayNumberEl)
+              : null;
+            const paddingTop = parsePx(dayStyles?.paddingTop);
+            const paddingBottom = parsePx(dayStyles?.paddingBottom);
+            const dayGap = parsePx(dayStyles?.rowGap || dayStyles?.gap);
+            const eventsGap = parsePx(eventsStyles?.rowGap || eventsStyles?.gap);
+            const eventsMarginTop = parsePx(eventsStyles?.marginTop);
+            const multiRows = Number.parseInt(dayEl?.dataset.multiRows || "0", 10);
+            const fixedMarginTop = multiRows > 0 ? eventsMarginTop : 0;
+            const eventsTopOffset =
+              dayRect && eventsRect ? eventsRect.top - dayRect.top - paddingTop : null;
+            const availableHeight =
+              dayRect && eventsRect
+                ? dayRect.height - paddingTop - paddingBottom - eventsTopOffset
+                : null;
+            const availableHeightUsed =
+              dayRect && dayNumberRect
+                ? Math.max(
+                    0,
+                    dayRect.height -
+                      paddingTop -
+                      paddingBottom -
+                      dayNumberRect.height -
+                      dayGap -
+                      fixedMarginTop
+                  )
+                : null;
+            const measureDay = monthMeasureRef.current?.querySelector(
+              `.display__event-measure-day[data-day-key="${cell.key}"]`
+            );
+            const chips = measureDay
+              ? Array.from(measureDay.querySelectorAll(".display__event-chip"))
+              : eventsEl
+                ? Array.from(eventsEl.querySelectorAll(".display__event-chip"))
+                : [];
+            const chipHeights = chips.map((chip) => chip.getBoundingClientRect().height);
+            let used = 0;
+            let computedCapacity = 0;
+            chipHeights.forEach((height) => {
+              const nextUsed = used === 0 ? height : used + eventsGap + height;
+              if (nextUsed <= availableHeight) {
+                used = nextUsed;
+                computedCapacity += 1;
+              }
+            });
+            hiddenDays.push({
+              key: cell.key,
+              date: cell.date?.toDateString?.() || "",
+              visibleLimit,
+              baseLimit: limitDetails.baseLimit,
+              rawLimit: limitDetails.rawLimit,
+              portraitClamp: limitDetails.portraitClamp,
+              reason: limitDetails.reason,
+              limitSource,
+              measuredCapacity: measuredCapacity ?? null,
+              totalEvents: events.length,
+              hiddenCount,
+              multiDayRows: week.multiDayRows.length,
+              titles: events.slice(0, 5).map((event) => event.summary),
+              dayHeight: dayRect?.height ?? null,
+              dayPaddingTop: paddingTop || null,
+              dayPaddingBottom: paddingBottom || null,
+              dayGap,
+              dayNumberHeight: dayNumberRect?.height ?? null,
+              dayNumberMarginTop: parsePx(dayNumberStyles?.marginTop) || null,
+              dayNumberMarginBottom: parsePx(dayNumberStyles?.marginBottom) || null,
+              eventsTopOffset,
+              eventsHeight: eventsRect?.height ?? null,
+              availableHeight,
+              availableHeightUsed,
+              fixedMarginTop,
+              eventsMarginTop,
+              eventsGap,
+              eventChipCount: chipHeights.length,
+              maxChipHeight: chipHeights.length ? Math.max(...chipHeights) : 0,
+              avgChipHeight: chipHeights.length
+                ? Number(
+                    (
+                      chipHeights.reduce((sum, height) => sum + height, 0) /
+                      chipHeights.length
+                    ).toFixed(2)
+                  )
+                : 0,
+              computedCapacity,
+              chipHeights: chipHeights.map((height) => Number(height.toFixed(2))),
+              usedHeight: Number(used.toFixed(2)),
+              measureDayWidth: monthMeasureWidth
+            });
+          }
+        });
+      });
+      console.groupCollapsed(
+        `[calendar debug] month hidden days: ${hiddenDays.length}`
+      );
+      console.table(hiddenDays);
+      console.log({
+        monthRowCount,
+        isNarrowPortrait,
+        viewportWidth: viewportSize.width,
+        viewportHeight: viewportSize.height
+      });
+      console.groupEnd();
+      return;
+    }
+    if (view === "fourWeek") {
+      const hiddenDays = [];
+      fourWeekRows.forEach((week) => {
+        week.cells.forEach((cell) => {
+          const events = (cell.events || []).filter(
+            (event) => !isMultiDayEvent(event)
+          );
+          const limitDetails = getDayEventLimitDebug(
+            fourWeekRowCount,
+            week.multiDayRows.length,
+            isNarrowPortrait
+          );
+          const measuredCapacity = fourWeekCapacities[cell.key];
+          const visibleLimit = getDayEventLimit(
+            fourWeekRowCount,
+            week.multiDayRows.length,
+            isNarrowPortrait,
+            measuredCapacity
+          );
+          const hiddenCount = Math.max(0, events.length - visibleLimit);
+          if (hiddenCount > 0) {
+            const limitSource =
+              typeof measuredCapacity === "number"
+                ? "measured capacity"
+                : limitDetails.portraitClamp
+                  ? "portrait clamp"
+                  : "baseLimit - multiDayRows";
+            const dayEl = document.querySelector(
+              `.display__day[data-day-key="${cell.key}"]`
+            );
+            const eventsEl = dayEl?.querySelector(".display__day-events");
+            const dayRect = dayEl?.getBoundingClientRect();
+            const eventsRect = eventsEl?.getBoundingClientRect();
+            const dayStyles = dayEl ? window.getComputedStyle(dayEl) : null;
+            const eventsStyles = eventsEl ? window.getComputedStyle(eventsEl) : null;
+            const dayNumberEl = dayEl?.querySelector(".display__day-number");
+            const dayNumberRect = dayNumberEl?.getBoundingClientRect();
+            const dayNumberStyles = dayNumberEl
+              ? window.getComputedStyle(dayNumberEl)
+              : null;
+            const paddingTop = parsePx(dayStyles?.paddingTop);
+            const paddingBottom = parsePx(dayStyles?.paddingBottom);
+            const dayGap = parsePx(dayStyles?.rowGap || dayStyles?.gap);
+            const eventsGap = parsePx(eventsStyles?.rowGap || eventsStyles?.gap);
+            const eventsMarginTop = parsePx(eventsStyles?.marginTop);
+            const multiRows = Number.parseInt(dayEl?.dataset.multiRows || "0", 10);
+            const fixedMarginTop = multiRows > 0 ? eventsMarginTop : 0;
+            const eventsTopOffset =
+              dayRect && eventsRect ? eventsRect.top - dayRect.top - paddingTop : null;
+            const availableHeight =
+              dayRect && eventsRect
+                ? dayRect.height - paddingTop - paddingBottom - eventsTopOffset
+                : null;
+            const availableHeightUsed =
+              dayRect && dayNumberRect
+                ? Math.max(
+                    0,
+                    dayRect.height -
+                      paddingTop -
+                      paddingBottom -
+                      dayNumberRect.height -
+                      dayGap -
+                      fixedMarginTop
+                  )
+                : null;
+            const measureDay = fourWeekMeasureRef.current?.querySelector(
+              `.display__event-measure-day[data-day-key="${cell.key}"]`
+            );
+            const chips = measureDay
+              ? Array.from(measureDay.querySelectorAll(".display__event-chip"))
+              : eventsEl
+                ? Array.from(eventsEl.querySelectorAll(".display__event-chip"))
+                : [];
+            const chipHeights = chips.map((chip) => chip.getBoundingClientRect().height);
+            let used = 0;
+            let computedCapacity = 0;
+            chipHeights.forEach((height) => {
+              const nextUsed = used === 0 ? height : used + eventsGap + height;
+              if (nextUsed <= availableHeight) {
+                used = nextUsed;
+                computedCapacity += 1;
+              }
+            });
+            hiddenDays.push({
+              key: cell.key,
+              date: cell.date?.toDateString?.() || "",
+              visibleLimit,
+              baseLimit: limitDetails.baseLimit,
+              rawLimit: limitDetails.rawLimit,
+              portraitClamp: limitDetails.portraitClamp,
+              reason: limitDetails.reason,
+              limitSource,
+              measuredCapacity: measuredCapacity ?? null,
+              totalEvents: events.length,
+              hiddenCount,
+              multiDayRows: week.multiDayRows.length,
+              titles: events.slice(0, 5).map((event) => event.summary),
+              dayHeight: dayRect?.height ?? null,
+              dayPaddingTop: paddingTop || null,
+              dayPaddingBottom: paddingBottom || null,
+              dayGap,
+              dayNumberHeight: dayNumberRect?.height ?? null,
+              dayNumberMarginTop: parsePx(dayNumberStyles?.marginTop) || null,
+              dayNumberMarginBottom: parsePx(dayNumberStyles?.marginBottom) || null,
+              eventsTopOffset,
+              eventsHeight: eventsRect?.height ?? null,
+              availableHeight,
+              availableHeightUsed,
+              fixedMarginTop,
+              eventsMarginTop,
+              eventsGap,
+              eventChipCount: chipHeights.length,
+              maxChipHeight: chipHeights.length ? Math.max(...chipHeights) : 0,
+              avgChipHeight: chipHeights.length
+                ? Number(
+                    (
+                      chipHeights.reduce((sum, height) => sum + height, 0) /
+                      chipHeights.length
+                    ).toFixed(2)
+                  )
+                : 0,
+              computedCapacity,
+              chipHeights: chipHeights.map((height) => Number(height.toFixed(2))),
+              usedHeight: Number(used.toFixed(2)),
+              measureDayWidth: fourWeekMeasureWidth
+            });
+          }
+        });
+      });
+      console.groupCollapsed(
+        `[calendar debug] fourWeek hidden days: ${hiddenDays.length}`
+      );
+      console.table(hiddenDays);
+      console.log({
+        fourWeekRowCount,
+        isNarrowPortrait,
+        viewportWidth: viewportSize.width,
+        viewportHeight: viewportSize.height
+      });
+      console.groupEnd();
+    }
+  }, [
+    debugEvents,
+    view,
+    monthWeekRows,
+    fourWeekRows,
+    monthRowCount,
+    fourWeekRowCount,
+    monthCapacities,
+    fourWeekCapacities,
+    monthMeasureWidth,
+    fourWeekMeasureWidth,
+    isNarrowPortrait,
+    viewportSize.width,
+    viewportSize.height
+  ]);
+
+ 
 
   return (
     <main className="display">
@@ -1166,7 +1667,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="display__calendar-weeks">
+                <div className="display__calendar-weeks" ref={monthWeeksRef}>
                   {monthWeekRows.map((week, weekIndex) => (
                     <div
                       key={`month-week-${weekIndex}`}
@@ -1193,12 +1694,19 @@ export default function App() {
                           const events = (cell.events || []).filter(
                             (event) => !isMultiDayEvent(event)
                           );
-                          const visibleLimit = Math.max(0, 3 - week.multiDayRows.length);
+          const visibleLimit = getDayEventLimit(
+            monthRowCount,
+            week.multiDayRows.length,
+            isNarrowPortrait,
+            monthCapacities[cell.key]
+          );
                           const visibleEvents = events.slice(0, visibleLimit);
                           const hiddenCount = Math.max(0, events.length - visibleLimit);
                           return (
                             <div
                               key={cell.key}
+                              data-day-key={cell.key}
+                              data-multi-rows={week.multiDayRows.length}
                               className={
                                 isToday
                                   ? "display__day display__day--today"
@@ -1437,7 +1945,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="display__calendar-weeks">
+                <div className="display__calendar-weeks" ref={fourWeekWeeksRef}>
                   {fourWeekRows.map((week, weekIndex) => (
                     <div
                       key={`four-week-${weekIndex}`}
@@ -1456,12 +1964,19 @@ export default function App() {
                           const events = (cell.events || []).filter(
                             (event) => !isMultiDayEvent(event)
                           );
-                          const visibleLimit = Math.max(0, 3 - week.multiDayRows.length);
+          const visibleLimit = getDayEventLimit(
+            fourWeekRowCount,
+            week.multiDayRows.length,
+            isNarrowPortrait,
+            fourWeekCapacities[cell.key]
+          );
                           const visibleEvents = events.slice(0, visibleLimit);
                           const hiddenCount = Math.max(0, events.length - visibleLimit);
                           return (
                             <div
                               key={cell.key}
+                              data-day-key={cell.key}
+                              data-multi-rows={week.multiDayRows.length}
                               className={
                                 isToday
                                   ? "display__day display__day--today"
@@ -1660,6 +2175,111 @@ export default function App() {
           </div>
         </div>
       </section>
+      {view === "month" ? (
+        <div
+          ref={monthMeasureRef}
+          className="display__event-measure"
+          style={
+            monthMeasureWidth
+              ? { "--measure-day-width": `${monthMeasureWidth}px` }
+              : undefined
+          }
+        >
+          {monthWeekRows.map((week) =>
+            week.cells.map((cell) => {
+              if (!cell.day) {
+                return null;
+              }
+              const events = (cell.events || []).filter(
+                (event) => !isMultiDayEvent(event)
+              );
+              if (!events.length) {
+                return (
+                  <div
+                    key={`measure-${cell.key}`}
+                    className="display__event-measure-day"
+                    data-day-key={cell.key}
+                  />
+                );
+              }
+              return (
+                <div
+                  key={`measure-${cell.key}`}
+                  className="display__event-measure-day"
+                  data-day-key={cell.key}
+                >
+                  {events.map((event) => (
+                    <div key={event.id} className="display__event-chip">
+                      {renderEventDots(event)}
+                      <span className="display__event-chip-text">
+                        {!event.allDay && !isMultiDayEvent(event) ? (
+                          <span className="display__event-chip-time">
+                            {formatEventTime(event, timeFormat)}
+                          </span>
+                        ) : null}
+                        <span className="display__event-chip-title">
+                          {event.summary}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : null}
+      {view === "fourWeek" ? (
+        <div
+          ref={fourWeekMeasureRef}
+          className="display__event-measure"
+          style={
+            fourWeekMeasureWidth
+              ? { "--measure-day-width": `${fourWeekMeasureWidth}px` }
+              : undefined
+          }
+        >
+          {fourWeekRows.map((week) =>
+            week.cells.map((cell) => {
+              const events = (cell.events || []).filter(
+                (event) => !isMultiDayEvent(event)
+              );
+              if (!events.length) {
+                return (
+                  <div
+                    key={`measure-${cell.key}`}
+                    className="display__event-measure-day"
+                    data-day-key={cell.key}
+                  />
+                );
+              }
+              return (
+                <div
+                  key={`measure-${cell.key}`}
+                  className="display__event-measure-day"
+                  data-day-key={cell.key}
+                >
+                  {events.map((event) => (
+                    <div key={event.id} className="display__event-chip">
+                      {renderEventDots(event)}
+                      <span className="display__event-chip-text">
+                        {!event.allDay && !isMultiDayEvent(event) ? (
+                          <span className="display__event-chip-time">
+                            {formatEventTime(event, timeFormat)}
+                          </span>
+                        ) : null}
+                        <span className="display__event-chip-title">
+                          {event.summary}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : null}
       {activeEvent ? (
           <div className="display__modal" role="dialog" aria-modal="true">
             <div className="display__modal-overlay" onClick={() => setActiveEvent(null)} />
