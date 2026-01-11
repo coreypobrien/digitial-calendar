@@ -12,7 +12,8 @@ export const defaultConfig = {
       accent: "#2b6f6b",
       text: "#1f1f1f"
     },
-    resetMinutes: 5
+    resetMinutes: 5,
+    mergeCalendars: true
   },
   refresh: {
     calendarMinutes: 10,

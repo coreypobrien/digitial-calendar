@@ -204,6 +204,37 @@ button {
   font: inherit;
 }
 
+.admin__field input[type="checkbox"] {
+  padding: 0;
+  border: none;
+  background: none;
+  width: auto;
+  height: auto;
+}
+
+.admin__field input[type="color"] {
+  padding: 0;
+  width: 88px;
+  height: 42px;
+  border-radius: 10px;
+  cursor: pointer;
+  justify-self: start;
+}
+
+.admin__field input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 4px;
+}
+
+.admin__field input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 8px;
+}
+
+.admin__field input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 8px;
+}
+
 .admin__field--button {
   align-content: end;
 }
@@ -264,14 +295,31 @@ button {
 }
 
 .admin__ical-item {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  align-items: end;
+  align-items: flex-end;
   padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--panel-border);
   background: #f9f7f3;
+}
+
+.admin__ical-item .admin__field {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.admin__ical-item .admin__field input[type="color"] {
+  width: 88px;
+}
+
+.admin__ical-item .admin__field:has(input[type="color"]) {
+  flex: 0 0 96px;
+}
+
+.admin__ical-actions {
+  flex: 0 0 auto;
 }
 
 .admin__ical-actions {
@@ -298,12 +346,15 @@ button {
     border-bottom: 1px solid var(--panel-border);
   }
 
-  .admin__ical-item {
-    grid-template-columns: 1fr;
-  }
-
   .admin__ical-actions {
+    flex: 1 1 100%;
     flex-direction: row;
     align-items: center;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .admin__ical-item .admin__field {
+    flex: 1 1 200px;
   }
 }

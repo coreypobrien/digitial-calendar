@@ -9,6 +9,7 @@
   --accent: #2b6f6b;
   --panel: rgba(255, 255, 255, 0.8);
   --panel-border: rgba(31, 31, 31, 0.12);
+  --app-height: 100vh;
 }
 
 * {
@@ -22,18 +23,24 @@ body,
   overflow: hidden;
 }
 
+@supports (height: 100dvh) {
+  :root {
+    --app-height: 100dvh;
+  }
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: var(--app-height);
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
   color: var(--ink);
   background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
 }
 
 .display {
-  min-height: 100vh;
-  height: 100vh;
-  padding: 48px 56px;
+  min-height: var(--app-height);
+  height: var(--app-height);
+  padding: 48px 56px calc(48px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -447,6 +454,26 @@ body {
   border-radius: 999px;
 }
 
+.display__event-dot-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.display__event-chip .display__event-dot-group {
+  align-self: stretch;
+  align-items: stretch;
+}
+
+.display__event-chip .display__event-dot {
+  width: 3px;
+  height: auto;
+  border-radius: 2px;
+  align-self: stretch;
+  margin: 2px 0;
+}
+
 .display__event-more {
   font-size: 12px;
   color: var(--muted);
@@ -746,7 +773,7 @@ body {
 
 @media (orientation: portrait) {
   .display {
-    padding: 64px 72px;
+    padding: 64px 72px calc(64px + env(safe-area-inset-bottom));
     gap: 40px;
   }
 
@@ -832,7 +859,7 @@ body {
 
 @media (orientation: portrait) and (max-width: 1200px) {
   .display {
-    padding: 32px 28px;
+    padding: 32px 28px calc(32px + env(safe-area-inset-bottom));
     gap: 24px;
   }
 
