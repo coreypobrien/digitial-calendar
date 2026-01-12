@@ -29,6 +29,7 @@ export const defaultConfig = {
   weather: {
     provider: "weathergov",
     units: "imperial",
+    showIcons: true,
     location: {
       type: "coords",
       value: "New York,US",

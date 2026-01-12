@@ -60,6 +60,12 @@ const normalizeConfig = (config) => {
       mergeCalendars: defaultConfig.display.mergeCalendars
     };
   }
+  if (next.weather?.showIcons === undefined) {
+    next.weather = {
+      ...next.weather,
+      showIcons: defaultConfig.weather.showIcons
+    };
+  }
   next.weather = {
     ...next.weather,
     provider: "weathergov",

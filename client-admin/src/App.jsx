@@ -30,6 +30,9 @@ export default function App() {
   const [calendarError, setCalendarError] = useState("");
   const [geoNotice, setGeoNotice] = useState("");
   const [geoError, setGeoError] = useState("");
+  const [weatherNotice, setWeatherNotice] = useState("");
+  const [weatherError, setWeatherError] = useState("");
+  const [weatherRefreshing, setWeatherRefreshing] = useState(false);
   const [formValues, setFormValues] = useState({ username: "", password: "" });
   const [activeTab, setActiveTab] = useState("display");
   const [choreData, setChoreData] = useState(null);
@@ -158,6 +161,22 @@ export default function App() {
     }
   };
 
+  const refreshWeather = async ({ notice } = {}) => {
+    setWeatherError("");
+    setWeatherNotice("");
+    setWeatherRefreshing(true);
+    const res = await fetchJson("/api/weather/refresh", {
+      method: "POST",
+      credentials: "include"
+    });
+    setWeatherRefreshing(false);
+    if (res.ok) {
+      setWeatherNotice(notice || "Weather refreshed.");
+    } else {
+      setWeatherError(res.data.error || "Unable to refresh weather.");
+    }
+  };
+
   const connectGoogle = async () => {
     setGoogleError("");
     const res = await fetchJson("/api/google/auth-url");
@@ -235,6 +254,7 @@ export default function App() {
     }
     setSaving(true);
     setSaveNotice("");
+    const previousLocationKey = getWeatherLocationKey(parseConfig(lastSavedConfig));
     const badFeed = (config.ical?.feeds || []).find((feed) => {
       if (!feed?.url || !feed.url.trim()) {
         return true;
@@ -259,9 +279,14 @@ export default function App() {
     });
     setSaving(false);
     if (res.ok) {
-      setConfig(res.data.config);
-      setLastSavedConfig(JSON.stringify(res.data.config));
+      const savedConfig = res.data.config;
+      setConfig(savedConfig);
+      setLastSavedConfig(JSON.stringify(savedConfig));
       setSaveNotice("Settings saved.");
+      const nextLocationKey = getWeatherLocationKey(savedConfig);
+      if (previousLocationKey !== nextLocationKey) {
+        refreshWeather({ notice: "Weather refreshed after location change." });
+      }
     } else {
       setSaveNotice(res.data.error || "Failed to save settings.");
     }
@@ -280,6 +305,30 @@ export default function App() {
       return fallback;
     }
     return parsed;
+  };
+
+  const parseConfig = (value) => {
+    if (!value) {
+      return null;
+    }
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  };
+
+  const getWeatherLocationKey = (source) => {
+    const location = source?.weather?.location;
+    if (!location) {
+      return "";
+    }
+    return [
+      location.type || "",
+      location.value || "",
+      location.lat ?? "",
+      location.lon ?? ""
+    ].join("|");
   };
 
   const calendarSelections = useMemo(() => {
@@ -924,13 +973,44 @@ export default function App() {
 
             {activeTab === "weather" && (
               <div className="admin__panel">
-                <h3>Weather Settings</h3>
+                <div className="admin__panel-header">
+                  <h3>Weather Settings</h3>
+                  <button
+                    type="button"
+                    className="admin__ghost"
+                    onClick={() => refreshWeather()}
+                    disabled={weatherRefreshing}
+                  >
+                    {weatherRefreshing ? "Refreshing…" : "Refresh now"}
+                  </button>
+                </div>
+                {weatherError ? <div className="admin__alert">{weatherError}</div> : null}
+                {weatherNotice ? <div className="admin__notice">{weatherNotice}</div> : null}
                 {geoError ? <div className="admin__alert">{geoError}</div> : null}
                 {geoNotice ? <div className="admin__notice">{geoNotice}</div> : null}
                 <p className="admin__muted">
                   weather.gov requires coordinates and only supports U.S. locations.
                 </p>
                 <div className="admin__grid">
+                  <div className="admin__field">
+                    Use weather icons
+                    <label className="admin__checkbox">
+                      <input
+                        type="checkbox"
+                        checked={config.weather.showIcons ?? true}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            weather: {
+                              ...prev.weather,
+                              showIcons: event.target.checked
+                            }
+                          }))
+                        }
+                      />
+                      Show icons on the display
+                    </label>
+                  </div>
                   <label className="admin__field">
                     Units
                     <select

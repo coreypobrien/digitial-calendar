@@ -2,6 +2,14 @@ const WEATHER_GOV_POINTS_URL = "https://api.weather.gov/points";
 
 const toLocalDateKey = (isoString) => (isoString ? isoString.split("T")[0] : null);
 
+const toPercent = (value) =>
+  value && typeof value.value === "number" ? value.value : null;
+
+const toDewpoint = (value) =>
+  value && typeof value.value === "number"
+    ? { value: value.value, unitCode: value.unitCode || "" }
+    : null;
+
 const getWeatherGovHeaders = () => ({
   "User-Agent": process.env.WEATHER_GOV_USER_AGENT || "wall-calendar (local)",
   Accept: "application/geo+json, application/json"
@@ -51,6 +59,13 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
         max: period.temperature,
         description: period.shortForecast || "",
         icon: period.icon || "",
+        detailedForecast: period.detailedForecast || "",
+        windSpeed: period.windSpeed || "",
+        windDirection: period.windDirection || "",
+        relativeHumidity: toPercent(period.relativeHumidity),
+        probabilityOfPrecipitation: toPercent(period.probabilityOfPrecipitation),
+        dewpoint: toDewpoint(period.dewpoint),
+        isDaytime: Boolean(period.isDaytime),
         _pickedDaytime: Boolean(period.isDaytime)
       };
       dailyIndex.set(dateKey, entry);
@@ -67,6 +82,15 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
     if (period.isDaytime && !entry._pickedDaytime) {
       entry.description = period.shortForecast || entry.description;
       entry.icon = period.icon || entry.icon;
+      entry.detailedForecast = period.detailedForecast || entry.detailedForecast;
+      entry.windSpeed = period.windSpeed || entry.windSpeed;
+      entry.windDirection = period.windDirection || entry.windDirection;
+      entry.relativeHumidity =
+        toPercent(period.relativeHumidity) ?? entry.relativeHumidity;
+      entry.probabilityOfPrecipitation =
+        toPercent(period.probabilityOfPrecipitation) ?? entry.probabilityOfPrecipitation;
+      entry.dewpoint = toDewpoint(period.dewpoint) || entry.dewpoint;
+      entry.isDaytime = Boolean(period.isDaytime);
       entry._pickedDaytime = true;
     } else if (!entry.description && period.shortForecast) {
       entry.description = period.shortForecast;
@@ -91,6 +115,13 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
       feelsLike: null,
       description: first.shortForecast || "",
       icon: first.icon || "",
+      detailedForecast: first.detailedForecast || "",
+      windSpeed: first.windSpeed || "",
+      windDirection: first.windDirection || "",
+      relativeHumidity: toPercent(first.relativeHumidity),
+      probabilityOfPrecipitation: toPercent(first.probabilityOfPrecipitation),
+      dewpoint: toDewpoint(first.dewpoint),
+      isDaytime: Boolean(first.isDaytime),
       time: first.startTime || null
     },
     today: {

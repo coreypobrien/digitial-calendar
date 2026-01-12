@@ -410,6 +410,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [weather, setWeather] = useState(null);
   const [weatherError, setWeatherError] = useState("");
+  const [weatherModalOpen, setWeatherModalOpen] = useState(false);
   const [eventsCache, setEventsCache] = useState({ events: [], updatedAt: null });
   const [refreshError, setRefreshError] = useState("");
   const [isRefreshingEvents, setIsRefreshingEvents] = useState(false);
@@ -637,12 +638,74 @@ export default function App() {
     weather?.current?.temp !== undefined && weather?.current?.temp !== null
       ? `${Math.round(weather.current.temp)}°${weatherUnits}`
       : null;
-  const weatherRange =
-    weather?.today?.min !== undefined && weather?.today?.max !== undefined
-      ? `${Math.round(weather.today.min)}° / ${Math.round(weather.today.max)}°`
-      : null;
   const weatherDescription = weather?.current?.description || "";
+  const weatherIcon = weather?.current?.icon || "";
   const weatherLocationName = weather?.location?.name || weatherLocation;
+  const useWeatherIcons = config?.weather?.showIcons ?? true;
+  const weatherUpdatedAt = weather?.updatedAt
+    ? new Date(weather.updatedAt).toLocaleString()
+    : "";
+  const weatherObservedAt = weather?.current?.time
+    ? new Date(weather.current.time).toLocaleString()
+    : "";
+  const weatherCurrent = weather?.current || {};
+  const weatherToday = weather?.today || {};
+  const weatherForecast = weather?.forecast || [];
+
+  const formatPercent = (value) =>
+    typeof value === "number" ? `${Math.round(value)}%` : "";
+
+  const formatDewpoint = (dewpoint) => {
+    if (!dewpoint || typeof dewpoint.value !== "number") {
+      return "";
+    }
+    let unit = "";
+    if (dewpoint.unitCode?.includes("degF")) {
+      unit = "F";
+    } else if (dewpoint.unitCode?.includes("degC")) {
+      unit = "C";
+    }
+    return `${Math.round(dewpoint.value)}°${unit}`;
+  };
+
+  const formatWind = (speed, direction) => {
+    if (!speed && !direction) {
+      return "";
+    }
+    if (speed && direction) {
+      return `${direction} ${speed}`;
+    }
+    return speed || direction;
+  };
+
+  const formatTemp = (value) =>
+    value !== undefined && value !== null ? `${Math.round(value)}°${weatherUnits}` : "";
+
+  const weatherHighLow =
+    weatherToday?.min !== undefined && weatherToday?.max !== undefined
+      ? `${formatTemp(weatherToday.max)} / ${formatTemp(weatherToday.min)}`
+      : "";
+
+  const weatherMetrics = [
+    { label: "High/Low", value: weatherHighLow },
+    { label: "Wind", value: formatWind(weatherCurrent.windSpeed, weatherCurrent.windDirection) },
+    { label: "Humidity", value: formatPercent(weatherCurrent.relativeHumidity) },
+    {
+      label: "Precip",
+      value: formatPercent(weatherCurrent.probabilityOfPrecipitation)
+    },
+    { label: "Dew point", value: formatDewpoint(weatherCurrent.dewpoint) },
+    {
+      label: "Daytime",
+      value:
+        typeof weatherCurrent.isDaytime === "boolean"
+          ? weatherCurrent.isDaytime
+            ? "Day"
+            : "Night"
+          : ""
+    },
+    { label: "Observed", value: weatherObservedAt }
+  ].filter((item) => item.value);
   const viewportWidth = viewportSize.width;
   const isCompactHeader = viewportWidth <= 1200;
   const isNarrowPortrait =
@@ -1515,18 +1578,37 @@ export default function App() {
           {error ? <p className="display__subtle">{error}</p> : null}
           {refreshError ? <p className="display__subtle">{refreshError}</p> : null}
         </div>
-        <div className="display__weather">
+        <div
+          className="display__weather"
+          role="button"
+          tabIndex={0}
+          aria-label="Open weather details"
+          onClick={() => setWeatherModalOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setWeatherModalOpen(true);
+            }
+          }}
+        >
           <div className="display__weather-main">
-            {weatherSummary ? (
-              <>
-                <strong>{weatherSummary}</strong>
-                <span>
-                  {weatherRange ? ` · ${weatherRange}` : ""} {weatherDescription}
-                </span>
-              </>
-            ) : (
-              <span>{weatherError || `${weatherLocationName} · ${weatherUnits}`}</span>
-            )}
+            {useWeatherIcons && weatherIcon ? (
+              <img
+                className="display__weather-icon"
+                src={weatherIcon}
+                alt={weatherDescription || "Weather icon"}
+              />
+            ) : null}
+            <div className="display__weather-details">
+              {weatherSummary ? (
+                <>
+                  <strong>{weatherSummary}</strong>
+                  <span>{weatherDescription}</span>
+                </>
+              ) : (
+                <span>{weatherError || `${weatherLocationName} · ${weatherUnits}`}</span>
+              )}
+            </div>
           </div>
           {weather?.forecast?.length ? (
             <div
@@ -1543,25 +1625,35 @@ export default function App() {
                   day.max !== undefined && day.max !== null
                     ? `${Math.round(day.max)}°`
                     : "";
-                const low =
-                  day.min !== undefined && day.min !== null
-                    ? `${Math.round(day.min)}°`
-                    : "";
-                const temps = high && low ? `${high}/${low}` : high || low;
-                const badge = getForecastBadge(day.description);
-                return (
-                  <div key={day.date} className="display__forecast-day">
-                    <span className="display__forecast-name">{dayLabel}</span>
-                    <span
-                      className={`display__forecast-badge display__forecast-badge--${badge.tone}`}
-                      title={day.description || "Forecast"}
-                    >
-                      {badge.label}
-                    </span>
-                    <span className="display__forecast-temps">{temps}</span>
-                  </div>
-                );
-              })}
+                    const low =
+                      day.min !== undefined && day.min !== null
+                        ? `${Math.round(day.min)}°`
+                        : "";
+                    const temps = high && low ? `${high}/${low}` : high || low;
+                    const badge = getForecastBadge(day.description);
+                    const iconSrc = day.icon || "";
+                    return (
+                      <div key={day.date} className="display__forecast-day">
+                        <span className="display__forecast-name">{dayLabel}</span>
+                        {useWeatherIcons && iconSrc ? (
+                          <img
+                            className="display__forecast-icon"
+                            src={iconSrc}
+                            alt={day.description || "Forecast"}
+                            title={day.description || "Forecast"}
+                          />
+                        ) : (
+                          <span
+                            className={`display__forecast-badge display__forecast-badge--${badge.tone}`}
+                            title={day.description || "Forecast"}
+                          >
+                            {badge.label}
+                          </span>
+                        )}
+                        <span className="display__forecast-temps">{temps}</span>
+                      </div>
+                    );
+                  })}
             </div>
           ) : null}
         </div>
@@ -2351,6 +2443,149 @@ export default function App() {
               ) : null}
             </div>
           </div>
+      ) : null}
+      {weatherModalOpen ? (
+        <div className="display__modal" role="dialog" aria-modal="true">
+          <div
+            className="display__modal-overlay"
+            onClick={() => setWeatherModalOpen(false)}
+          />
+          <div className="display__modal-card display__modal-card--weather">
+            <div className="display__modal-header">
+              <div>
+                <h3 className="display__modal-title">Weather</h3>
+                <p className="display__modal-subtitle">
+                  {weatherLocationName}
+                  {weatherUpdatedAt ? ` · Updated ${weatherUpdatedAt}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="display__modal-close"
+                onClick={() => setWeatherModalOpen(false)}
+                aria-label="Close weather details"
+              >
+                X
+              </button>
+            </div>
+            {weather ? (
+              <>
+                {weatherError ? (
+                  <div className="display__weather-modal-alert">{weatherError}</div>
+                ) : null}
+                <div className="display__weather-modal-current">
+                  {useWeatherIcons && weatherCurrent.icon ? (
+                    <img
+                      className="display__weather-modal-icon"
+                      src={weatherCurrent.icon}
+                      alt={weatherCurrent.description || "Current weather icon"}
+                    />
+                  ) : null}
+                  <div className="display__weather-modal-current-main">
+                    <div className="display__weather-modal-temp">
+                      {weatherSummary || formatTemp(weatherCurrent.temp) || "—"}
+                    </div>
+                    <div className="display__weather-modal-desc">
+                      {weatherCurrent.description || "—"}
+                    </div>
+                    {weatherCurrent.detailedForecast ? (
+                      <p className="display__weather-modal-detail">
+                        {weatherCurrent.detailedForecast}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                {weatherMetrics.length ? (
+                  <div className="display__weather-modal-metrics">
+                    {weatherMetrics.map((item) => (
+                      <div key={item.label} className="display__weather-modal-metric">
+                        <span className="display__weather-modal-label">{item.label}</span>
+                        <span className="display__weather-modal-value">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="display__weather-modal-section">
+                  <h4 className="display__weather-modal-heading">Forecast</h4>
+                  {weatherForecast.length ? (
+                    <div className="display__weather-modal-forecast">
+                      {weatherForecast.map((day) => {
+                        const date = day.date ? new Date(`${day.date}T00:00:00`) : null;
+                        const dayLabel =
+                          date && !Number.isNaN(date.getTime())
+                            ? date.toLocaleDateString([], { weekday: "long" })
+                            : "Forecast";
+                        const high = formatTemp(day.max);
+                        const low = formatTemp(day.min);
+                        const temps = high && low ? `${high} / ${low}` : high || low;
+                        const badge = getForecastBadge(day.description);
+                        const detailParts = [
+                          day.probabilityOfPrecipitation !== undefined &&
+                          day.probabilityOfPrecipitation !== null
+                            ? `Precip ${formatPercent(day.probabilityOfPrecipitation)}`
+                            : "",
+                          day.relativeHumidity !== undefined && day.relativeHumidity !== null
+                            ? `Humidity ${formatPercent(day.relativeHumidity)}`
+                            : "",
+                          formatWind(day.windSpeed, day.windDirection)
+                            ? `Wind ${formatWind(day.windSpeed, day.windDirection)}`
+                            : ""
+                        ].filter(Boolean);
+                        return (
+                          <div key={day.date} className="display__weather-modal-forecast-day">
+                            <div className="display__weather-modal-forecast-header">
+                              <span className="display__weather-modal-forecast-label">
+                                {dayLabel}
+                              </span>
+                              <span className="display__weather-modal-forecast-temps">
+                                {temps || "—"}
+                              </span>
+                            </div>
+                            <div className="display__weather-modal-forecast-main">
+                              {useWeatherIcons && day.icon ? (
+                                <img
+                                  className="display__weather-modal-forecast-icon"
+                                  src={day.icon}
+                                  alt={day.description || "Forecast icon"}
+                                />
+                              ) : (
+                                <span
+                                  className={`display__forecast-badge display__forecast-badge--${badge.tone}`}
+                                  title={day.description || "Forecast"}
+                                >
+                                  {badge.label}
+                                </span>
+                              )}
+                              <div className="display__weather-modal-forecast-summary">
+                                <span>{day.description || "—"}</span>
+                                {detailParts.length ? (
+                                  <span className="display__weather-modal-forecast-meta">
+                                    {detailParts.join(" · ")}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            {day.detailedForecast ? (
+                              <p className="display__weather-modal-forecast-detail">
+                                {day.detailedForecast}
+                              </p>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="display__modal-text">No forecast available.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="display__modal-text">
+                {weatherError || "Weather unavailable."}
+              </p>
+            )}
+          </div>
+        </div>
       ) : null}
     </main>
   );

@@ -47,6 +47,7 @@ export const ConfigSchema = z.object({
   weather: z.object({
     provider: z.literal("weathergov"),
     units: z.enum(["metric", "imperial"]),
+    showIcons: z.boolean(),
     location: z.object({
       type: z.enum(["city", "coords"]),
       value: z.string(),
