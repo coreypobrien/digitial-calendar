@@ -1,4 +1,11 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import ChoreView from "./components/ChoreView.jsx";
 
 import {
@@ -18,6 +25,7 @@ const DAILY_SLOT_MINUTES = 15;
 const DAILY_SLOT_HEIGHT = 24;
 const WEEK_EVENT_LIMIT = 6;
 const TIME_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const IDLE_RESET_MINUTES = 1;
 
 const formatTime = (date, timeFormat) =>
   date.toLocaleTimeString([], {
@@ -435,6 +443,44 @@ export default function App() {
   const [fourWeekCapacities, setFourWeekCapacities] = useState({});
   const [monthMeasureWidth, setMonthMeasureWidth] = useState(null);
   const [fourWeekMeasureWidth, setFourWeekMeasureWidth] = useState(null);
+  const lastInteractionRef = useRef(Date.now());
+  const resetTimerRef = useRef(null);
+  const lastDayKeyRef = useRef(toLocalDateKey(new Date()));
+  const dayChangeTimerRef = useRef(null);
+  const debugEvents = useMemo(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return new URLSearchParams(window.location.search).has("debugEvents");
+  }, []);
+
+  const logDebug = useCallback(
+    (message, payload) => {
+      if (!debugEvents) {
+        return;
+      }
+      if (payload !== undefined) {
+        console.log(`[calendar debug] ${message}`, payload);
+      } else {
+        console.log(`[calendar debug] ${message}`);
+      }
+    },
+    [debugEvents]
+  );
+
+  const clearIdleResetTimer = () => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  };
+
+  const resetToToday = (baseDate) => {
+    const nextDate = baseDate ? new Date(baseDate) : new Date();
+    setSelectedDate(nextDate);
+    setMonthOffset(0);
+    setFourWeekAnchorDate(getWeekStart(nextDate));
+  };
   const handleViewChange = (nextView) => {
     setView(nextView);
     if (nextView === "month") {
@@ -479,6 +525,80 @@ export default function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const markInteraction = () => {
+      const idleMs = Date.now() - lastInteractionRef.current;
+      logDebug("idle reset on interaction", { idleMs });
+      lastInteractionRef.current = Date.now();
+      clearIdleResetTimer();
+    };
+    const events = ["pointerdown", "keydown", "touchstart", "wheel"];
+    events.forEach((eventName) => window.addEventListener(eventName, markInteraction));
+    return () => {
+      events.forEach((eventName) => window.removeEventListener(eventName, markInteraction));
+    };
+  }, []);
+
+  useEffect(() => {
+    const scheduleNextDayCheck = () => {
+      const current = new Date(Date.now() + timeOffsetMs);
+      const nextMidnight = new Date(current);
+      nextMidnight.setHours(24, 0, 0, 0);
+      const delayMs = Math.max(0, nextMidnight.getTime() - current.getTime());
+      logDebug("next day check scheduled", {
+        now: current.toLocaleString(),
+        nextMidnight: nextMidnight.toLocaleString(),
+        delayMs
+      });
+      if (dayChangeTimerRef.current) {
+        clearTimeout(dayChangeTimerRef.current);
+      }
+      dayChangeTimerRef.current = setTimeout(() => {
+        const nowDate = new Date(Date.now() + timeOffsetMs);
+        const todayKeyLocal = toLocalDateKey(nowDate);
+        const previousKey = lastDayKeyRef.current;
+        if (previousKey && previousKey !== todayKeyLocal) {
+          const thresholdMs = IDLE_RESET_MINUTES * 60 * 1000;
+          const idleMs = Date.now() - lastInteractionRef.current;
+          if (idleMs >= thresholdMs) {
+            logDebug("day rollover reset", { idleMs, thresholdMs });
+            resetToToday(nowDate);
+          } else {
+            const delay = thresholdMs - idleMs;
+            logDebug("day rollover idle delay scheduled", { idleMs, thresholdMs, delayMs: delay });
+            clearIdleResetTimer();
+            resetTimerRef.current = setTimeout(() => {
+              const idleNow = Date.now() - lastInteractionRef.current;
+              if (idleNow < thresholdMs) {
+                return;
+              }
+              const idleDate = new Date(Date.now() + timeOffsetMs);
+              if (toLocalDateKey(idleDate) === todayKeyLocal) {
+                logDebug("day rollover reset after idle", {
+                  idleMs: idleNow,
+                  thresholdMs
+                });
+                resetToToday(idleDate);
+              }
+            }, delay);
+          }
+          lastDayKeyRef.current = todayKeyLocal;
+        }
+        scheduleNextDayCheck();
+      }, delayMs);
+    };
+
+    lastDayKeyRef.current = toLocalDateKey(new Date(Date.now() + timeOffsetMs));
+    scheduleNextDayCheck();
+    return () => {
+      if (dayChangeTimerRef.current) {
+        clearTimeout(dayChangeTimerRef.current);
+        dayChangeTimerRef.current = null;
+      }
+      clearIdleResetTimer();
+    };
+  }, [logDebug, timeOffsetMs]);
 
   useEffect(() => {
     let active = true;
@@ -556,8 +676,12 @@ export default function App() {
     };
 
     loadEvents();
-    if (config?.refresh?.calendarMinutes) {
-      const intervalMs = Math.max(1, config.refresh.calendarMinutes) * 60 * 1000;
+    if (config?.refresh?.clientMinutes) {
+      const intervalMs = Math.max(1, config.refresh.clientMinutes) * 60 * 1000;
+      logDebug("calendar refresh scheduled", {
+        intervalMs,
+        nextRefresh: new Date(Date.now() + intervalMs).toLocaleString()
+      });
       const timer = setInterval(loadEvents, intervalMs);
       return () => {
         active = false;
@@ -567,7 +691,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [config?.refresh?.calendarMinutes]);
+  }, [config?.refresh?.clientMinutes, logDebug]);
 
   useEffect(() => {
     let active = true;
@@ -591,10 +715,22 @@ export default function App() {
       }
     };
     loadWeather();
+    if (config?.refresh?.clientMinutes) {
+      const intervalMs = Math.max(1, config.refresh.clientMinutes) * 60 * 1000;
+      logDebug("weather refresh scheduled", {
+        intervalMs,
+        nextRefresh: new Date(Date.now() + intervalMs).toLocaleString()
+      });
+      const timer = setInterval(loadWeather, intervalMs);
+      return () => {
+        active = false;
+        clearInterval(timer);
+      };
+    }
     return () => {
       active = false;
     };
-  }, []);
+  }, [config?.refresh?.clientMinutes, logDebug]);
 
   const handleRefreshEvents = async () => {
     setIsRefreshingEvents(true);
@@ -630,7 +766,6 @@ export default function App() {
   const defaultView = viewLabels[config?.display?.defaultView]
     ? config.display.defaultView
     : "month";
-  const resetMinutes = Number(config?.display?.resetMinutes ?? 5);
   const weatherLocation = config?.weather?.location?.value || "Weather";
   const weatherUnitsRaw = weather?.units || config?.weather?.units || "imperial";
   const weatherUnits = weatherUnitsRaw === "metric" ? "C" : "F";
@@ -712,13 +847,6 @@ export default function App() {
     viewportSize.height >= viewportSize.width && viewportWidth <= 1200;
   const dateLabel = formatDate(now, isCompactHeader ? "short" : "long");
   const forecastDays = viewportWidth <= 1000 ? 5 : 7;
-  const debugEvents = useMemo(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-    return new URLSearchParams(window.location.search).has("debugEvents");
-  }, []);
-
   const sanitizeDescription = (value = "") => {
     if (!value) {
       return "";
@@ -967,31 +1095,6 @@ export default function App() {
     return events.sort((a, b) => a.startSlot - b.startSlot);
   }, [selectedEvents, timeFormat, dailyWindow]);
   const isDayEmpty = !allDayEvents.length && !timedEvents.length;
-
-  useEffect(() => {
-    if (!resetMinutes || resetMinutes <= 0) {
-      return undefined;
-    }
-    const today = new Date();
-    const todayKeyLocal = toLocalDateKey(today);
-    if (selectedKey === todayKeyLocal) {
-      return undefined;
-    }
-    const timer = setTimeout(() => {
-      setSelectedDate(new Date());
-    }, resetMinutes * 60 * 1000);
-    return () => clearTimeout(timer);
-  }, [resetMinutes, selectedKey]);
-
-  useEffect(() => {
-    if (!resetMinutes || resetMinutes <= 0 || monthOffset === 0) {
-      return undefined;
-    }
-    const timer = setTimeout(() => {
-      setMonthOffset(0);
-    }, resetMinutes * 60 * 1000);
-    return () => clearTimeout(timer);
-  }, [resetMinutes, monthOffset]);
 
   useEffect(() => {
     if (view !== "month") {

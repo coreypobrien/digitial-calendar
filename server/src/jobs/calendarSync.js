@@ -39,7 +39,7 @@ export const startCalendarSyncJob = async (logger) => {
   while (true) {
     try {
       const { config } = await loadConfig();
-      const intervalMs = Math.max(1, config.refresh.calendarMinutes) * 60 * 1000;
+      const intervalMs = Math.max(1, config.refresh.calendarSyncMinutes) * 60 * 1000;
       await runSync(logger);
       await sleep(intervalMs);
     } catch (error) {

@@ -26,7 +26,7 @@ router.get("/", async (_req, res, next) => {
   try {
     const { config } = await loadConfig();
     const cache = await loadWeatherCache();
-    if (cache.updatedAt && isFresh(cache.updatedAt, config.refresh.weatherMinutes)) {
+    if (cache.updatedAt && isFresh(cache.updatedAt, config.refresh.weatherSyncMinutes)) {
       res.json({ ...cache, stale: false });
       return;
     }

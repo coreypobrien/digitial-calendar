@@ -642,26 +642,6 @@ export default function App() {
                         <option value="24h">24 hour</option>
                       </select>
                     </label>
-                    <label className="admin__field">
-                      Reset timer (minutes)
-                      <input
-                        type="number"
-                        min="0"
-                        value={config.display.resetMinutes ?? 0}
-                        onChange={(event) =>
-                          updateConfig((prev) => ({
-                            ...prev,
-                            display: {
-                              ...prev.display,
-                              resetMinutes: updateNumber(
-                                event.target.value,
-                                prev.display.resetMinutes
-                              )
-                            }
-                          }))
-                        }
-                      />
-                    </label>
                     <div className="admin__field">
                       Merge duplicate events
                       <label className="admin__checkbox">
@@ -735,19 +715,19 @@ export default function App() {
                   <h3>Refresh Intervals</h3>
                   <div className="admin__grid">
                     <label className="admin__field">
-                      Calendar refresh (minutes)
+                      Calendar sync (minutes)
                       <input
                         type="number"
                         min="1"
-                        value={config.refresh.calendarMinutes}
+                        value={config.refresh.calendarSyncMinutes}
                         onChange={(event) =>
                           updateConfig((prev) => ({
                             ...prev,
                             refresh: {
                               ...prev.refresh,
-                              calendarMinutes: updateNumber(
+                              calendarSyncMinutes: updateNumber(
                                 event.target.value,
-                                prev.refresh.calendarMinutes
+                                prev.refresh.calendarSyncMinutes
                               )
                             }
                           }))
@@ -755,19 +735,39 @@ export default function App() {
                       />
                     </label>
                     <label className="admin__field">
-                      Weather refresh (minutes)
+                      Weather sync (minutes)
                       <input
                         type="number"
                         min="1"
-                        value={config.refresh.weatherMinutes}
+                        value={config.refresh.weatherSyncMinutes}
                         onChange={(event) =>
                           updateConfig((prev) => ({
                             ...prev,
                             refresh: {
                               ...prev.refresh,
-                              weatherMinutes: updateNumber(
+                              weatherSyncMinutes: updateNumber(
                                 event.target.value,
-                                prev.refresh.weatherMinutes
+                                prev.refresh.weatherSyncMinutes
+                              )
+                            }
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="admin__field">
+                      Display refresh (minutes)
+                      <input
+                        type="number"
+                        min="1"
+                        value={config.refresh.clientMinutes}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            refresh: {
+                              ...prev.refresh,
+                              clientMinutes: updateNumber(
+                                event.target.value,
+                                prev.refresh.clientMinutes
                               )
                             }
                           }))

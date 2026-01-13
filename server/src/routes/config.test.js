@@ -56,14 +56,14 @@ describe("config routes", () => {
       },
       refresh: {
         ...current.body.config.refresh,
-        calendarMinutes: 5
+        calendarSyncMinutes: 5
       }
     };
 
     const res = await agent.put("/api/settings").send(nextConfig);
     expect(res.status).toBe(200);
     expect(res.body.config.display.defaultView).toBe("month");
-    expect(res.body.config.refresh.calendarMinutes).toBe(5);
+    expect(res.body.config.refresh.calendarSyncMinutes).toBe(5);
   });
 
   it("rejects invalid settings payloads", async () => {

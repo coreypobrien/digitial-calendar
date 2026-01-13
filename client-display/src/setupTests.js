@@ -21,3 +21,11 @@ HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
   fillRect: vi.fn(),
   fillStyle: "",
 }));
+
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+globalThis.ResizeObserver = MockResizeObserver;

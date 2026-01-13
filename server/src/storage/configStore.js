@@ -38,22 +38,6 @@ const normalizeConfig = (config) => {
   ) {
     next.display = { ...next.display, defaultView: "month" };
   }
-  if ("dailyResetMinutes" in next.display || "monthResetMinutes" in next.display) {
-    const { dailyResetMinutes, monthResetMinutes, ...rest } = next.display;
-    next.display = {
-      ...rest,
-      resetMinutes:
-        dailyResetMinutes ??
-        monthResetMinutes ??
-        rest.resetMinutes ??
-        defaultConfig.display.resetMinutes
-    };
-  } else if (next.display?.resetMinutes === undefined) {
-    next.display = {
-      ...next.display,
-      resetMinutes: defaultConfig.display.resetMinutes
-    };
-  }
   if (next.display?.mergeCalendars === undefined) {
     next.display = {
       ...next.display,
@@ -74,6 +58,21 @@ const normalizeConfig = (config) => {
       type: "coords"
     }
   };
+  if (next.refresh) {
+    const { calendarMinutes, weatherMinutes, ...rest } = next.refresh;
+    next.refresh = {
+      ...rest,
+      calendarSyncMinutes:
+        rest.calendarSyncMinutes ??
+        calendarMinutes ??
+        defaultConfig.refresh.calendarSyncMinutes,
+      weatherSyncMinutes:
+        rest.weatherSyncMinutes ?? weatherMinutes ?? defaultConfig.refresh.weatherSyncMinutes,
+      clientMinutes: rest.clientMinutes ?? calendarMinutes ?? defaultConfig.refresh.clientMinutes
+    };
+  } else {
+    next.refresh = { ...defaultConfig.refresh };
+  }
   return next;
 };
 

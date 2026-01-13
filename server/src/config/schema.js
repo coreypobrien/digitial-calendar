@@ -30,12 +30,12 @@ export const ConfigSchema = z.object({
     defaultView: z.enum(["month", "fourWeek", "week", "activity", "chores"]),
     timeFormat: z.enum(["12h", "24h"]),
     theme: ThemeSchema,
-    resetMinutes: z.number().int().min(0).max(1440),
     mergeCalendars: z.boolean()
   }),
   refresh: z.object({
-    calendarMinutes: z.number().int().min(1),
-    weatherMinutes: z.number().int().min(1)
+    calendarSyncMinutes: z.number().int().min(1),
+    weatherSyncMinutes: z.number().int().min(1),
+    clientMinutes: z.number().int().min(1)
   }),
   calendars: z.array(CalendarSourceSchema),
   ical: z.object({

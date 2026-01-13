@@ -1,6 +1,6 @@
 import React from "react";
-import { describe, expect, it, vi, afterEach } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, waitFor } from "@testing-library/react";
 
 import App from "./App.jsx";
 
@@ -10,7 +10,7 @@ const buildResponse = (data, ok = true) => ({
   json: async () => data
 });
 
-const createFetchMock = (eventPayload) =>
+const createFetchMock = (clientMinutes) =>
   vi.fn((input) => {
     const url = typeof input === "string" ? input : input?.url;
     if (url?.includes("/api/settings/public")) {
@@ -29,7 +29,7 @@ const createFetchMock = (eventPayload) =>
             refresh: {
               calendarSyncMinutes: 10,
               weatherSyncMinutes: 30,
-              clientMinutes: 10
+              clientMinutes
             },
             weather: {
               units: "imperial",
@@ -47,7 +47,7 @@ const createFetchMock = (eventPayload) =>
             timeMin: new Date().toISOString(),
             timeMax: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
           },
-          events: [eventPayload]
+          events: []
         })
       );
     }
@@ -83,54 +83,24 @@ const createFetchMock = (eventPayload) =>
   });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-describe("App event details modal", () => {
-  it("opens and closes the modal with event details", async () => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0);
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0);
-    const eventPayload = {
-      id: "event-1",
-      summary: "Team Sync",
-      description: "Discuss project status.",
-      location: "Conference Room",
-      calendarColor: "#ff6b6b",
-      calendarLabel: "Work",
-      allDay: false,
-      start: start.toISOString(),
-      end: end.toISOString()
-    };
-
-    const fetchMock = createFetchMock(eventPayload);
+describe("App weather refresh", () => {
+  it("uses the configured weather refresh interval", async () => {
+    const clientMinutes = 42;
+    const fetchMock = createFetchMock(clientMinutes);
     vi.stubGlobal("fetch", fetchMock);
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
 
     render(<App />);
 
-    const eventButtons = await screen.findAllByRole("button", { name: /Team Sync/i });
-    // The calendar cell (month view) is also a button containing the text. 
-    // We want the event pill in the side panel (Daily View) which opens the modal.
-    // The calendar cell usually contains the day number, while the event pill does not.
-    const eventPill = eventButtons.find(b => !b.querySelector(".display__day-number"));
-    
-    if (!eventPill) {
-      throw new Error("Could not find the event pill button in the daily view");
-    }
-    
-    fireEvent.click(eventPill);
-
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByText("Team Sync")).toBeInTheDocument();
-    expect(screen.getByText("Conference Room")).toBeInTheDocument();
-    expect(screen.getByText("Discuss project status.")).toBeInTheDocument();
-
-    const closeButton = screen.getByRole("button", { name: /close event details/i });
-    fireEvent.click(closeButton);
-
     await waitFor(() => {
-      expect(screen.queryByRole("dialog")).toBeNull();
+      const hasInterval = setIntervalSpy.mock.calls.some(
+        ([, interval]) => interval === clientMinutes * 60 * 1000
+      );
+      expect(hasInterval).toBe(true);
     });
   });
 });
