@@ -212,4 +212,46 @@ describe("App weather refresh", () => {
     expect(windMetric).not.toBeNull();
     expect(windMetric).toHaveTextContent("SSW (200°) 5 mph gust 12 mph");
   });
+
+  it("renders a Tonight label with a single temperature", async () => {
+    const weatherData = {
+      units: "imperial",
+      location: { name: "Test" },
+      current: {
+        temp: 55,
+        description: "Clear",
+        icon: "",
+        time: new Date().toISOString()
+      },
+      today: {
+        min: 43,
+        max: 55
+      },
+      forecast: [
+        {
+          date: "2025-01-01",
+          label: "Tonight",
+          min: 43,
+          max: null,
+          description: "Clear",
+          icon: ""
+        }
+      ]
+    };
+    const fetchMock = createWeatherFetchMock(weatherData);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    const widget = await screen.findByRole("button", {
+      name: /open weather details/i
+    });
+    expect(within(widget).getByText("Tonight")).toBeInTheDocument();
+    expect(within(widget).getByText("43°")).toBeInTheDocument();
+
+    fireEvent.click(widget);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Tonight")).toBeInTheDocument();
+  });
 });

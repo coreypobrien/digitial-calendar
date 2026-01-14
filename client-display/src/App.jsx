@@ -1807,8 +1807,9 @@ export default function App() {
             >
               {weather.forecast.slice(0, forecastDays).map((day) => {
                 const date = day.date ? new Date(`${day.date}T00:00:00`) : null;
-                const dayLabel =
-                  date && !Number.isNaN(date.getTime())
+                const dayLabel = day.label
+                  ? day.label
+                  : date && !Number.isNaN(date.getTime())
                     ? date.toLocaleDateString([], { weekday: "short" })
                     : "";
                 const high =
@@ -2701,8 +2702,9 @@ export default function App() {
                     <div className="display__weather-modal-forecast">
                       {weatherForecast.map((day) => {
                         const date = day.date ? new Date(`${day.date}T00:00:00`) : null;
-                        const dayLabel =
-                          date && !Number.isNaN(date.getTime())
+                        const dayLabel = day.label
+                          ? day.label
+                          : date && !Number.isNaN(date.getTime())
                             ? date.toLocaleDateString([], { weekday: "long" })
                             : "Forecast";
                         const high = formatTemp(day.max);

@@ -190,6 +190,14 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
     }
   });
 
+  if (dayKey && first && first.isDaytime === false) {
+    const firstEntry = dailyIndex.get(dayKey);
+    if (firstEntry) {
+      firstEntry.label = "Tonight";
+      firstEntry.max = null;
+    }
+  }
+
   const locationProps = pointsPayload?.properties?.relativeLocation?.properties;
   const locationName = locationProps?.city
     ? `${locationProps.city}${locationProps.state ? `, ${locationProps.state}` : ""}`
@@ -221,7 +229,9 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
       min,
       max
     },
-    forecast: dailyForecast.slice(0, 7).map(({ _pickedDaytime, ...rest }) => rest)
+    forecast: dailyForecast
+      .slice(0, 7)
+      .map(({ _pickedDaytime, ...rest }) => rest)
   };
 };
 

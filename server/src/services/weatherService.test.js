@@ -109,6 +109,44 @@ describe("weatherService", () => {
     expect(data.forecast[1].detailedForecast).toBe("Clear skies.");
   });
 
+  it("labels tonight when the first period is nighttime", () => {
+    const pointsPayload = {
+      geometry: { coordinates: [-74, 40.7] },
+      properties: {
+        relativeLocation: { properties: { city: "New York", state: "NY" } }
+      }
+    };
+    const forecastPayload = {
+      properties: {
+        periods: [
+          {
+            startTime: "2025-01-01T21:00:00-05:00",
+            temperature: 43,
+            temperatureUnit: "F",
+            shortForecast: "Clear",
+            icon: "https://example.com/icon",
+            isDaytime: false
+          },
+          {
+            startTime: "2025-01-02T09:00:00-05:00",
+            temperature: 50,
+            temperatureUnit: "F",
+            shortForecast: "Sunny",
+            icon: "https://example.com/icon",
+            isDaytime: true
+          }
+        ]
+      }
+    };
+
+    const data = parseWeatherGovForecast(pointsPayload, forecastPayload);
+
+    expect(data.current.temp).toBe(43);
+    expect(data.forecast[0].label).toBe("Tonight");
+    expect(data.forecast[0].min).toBe(43);
+    expect(data.forecast[0].max).toBeNull();
+  });
+
   it("merges latest observations into current weather", async () => {
     const pointsUrl = "https://api.weather.gov/points/38.1724,-85.5716";
     const forecastUrl = "https://api.weather.gov/gridpoints/LMK/56,74/forecast";
