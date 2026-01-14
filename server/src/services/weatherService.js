@@ -10,6 +10,99 @@ const toDewpoint = (value) =>
     ? { value: value.value, unitCode: value.unitCode || "" }
     : null;
 
+const convertTemperature = (temperature, units) => {
+  if (!temperature || typeof temperature.value !== "number") {
+    return null;
+  }
+  const unitCode = temperature.unitCode || "";
+  const value = temperature.value;
+  if (units === "metric") {
+    return unitCode.includes("degF") ? ((value - 32) * 5) / 9 : value;
+  }
+  if (units === "imperial") {
+    return unitCode.includes("degC") ? (value * 9) / 5 + 32 : value;
+  }
+  return value;
+};
+
+const windDirectionToCardinal = (degrees) => {
+  if (typeof degrees !== "number" || Number.isNaN(degrees)) {
+    return "";
+  }
+  const directions = [
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW"
+  ];
+  const index = Math.round(degrees / 22.5) % directions.length;
+  return directions[index];
+};
+
+const formatWindSpeed = (windSpeed, units) => {
+  if (!windSpeed || typeof windSpeed.value !== "number") {
+    return "";
+  }
+  const value = windSpeed.value;
+  const unitCode = windSpeed.unitCode || "";
+  const isMetersPerSecond = unitCode.includes("m_s-1");
+  if (units === "metric") {
+    const kmh = unitCode.includes("km_h-1")
+      ? value
+      : isMetersPerSecond
+        ? value * 3.6
+        : value * 1.60934;
+    return `${Math.round(kmh)} km/h`;
+  }
+  if (units === "imperial") {
+    const mph = unitCode.includes("km_h-1")
+      ? value * 0.621371
+      : isMetersPerSecond
+        ? value * 2.23694
+        : value;
+    return `${Math.round(mph)} mph`;
+  }
+  return `${Math.round(value)}`;
+};
+
+const convertPressure = (pressure, units) => {
+  if (!pressure || typeof pressure.value !== "number") {
+    return null;
+  }
+  const value = pressure.value;
+  const unitCode = pressure.unitCode || "";
+  const isHPa = unitCode.includes("hPa") || unitCode.includes("mb");
+  const isKPa = unitCode.includes("kPa");
+  const isPascals = unitCode.includes("Pa") && !isHPa && !isKPa;
+  const hPaValue = isHPa ? value : isKPa ? value * 10 : isPascals ? value / 100 : value;
+  if (units === "metric") {
+    return { value: hPaValue, unit: "hPa" };
+  }
+  if (units === "imperial") {
+    const inHgValue = isPascals
+      ? value * 0.0002953
+      : isKPa
+        ? value * 0.2953
+        : isHPa
+          ? value * 0.02953
+          : value * 0.02953;
+    return { value: inHgValue, unit: "inHg" };
+  }
+  return { value, unit: unitCode || "" };
+};
+
 const getWeatherGovHeaders = () => ({
   "User-Agent": process.env.WEATHER_GOV_USER_AGENT || "wall-calendar (local)",
   Accept: "application/geo+json, application/json"
@@ -97,6 +190,14 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
     }
   });
 
+  if (dayKey && first && first.isDaytime === false) {
+    const firstEntry = dailyIndex.get(dayKey);
+    if (firstEntry) {
+      firstEntry.label = "Tonight";
+      firstEntry.max = null;
+    }
+  }
+
   const locationProps = pointsPayload?.properties?.relativeLocation?.properties;
   const locationName = locationProps?.city
     ? `${locationProps.city}${locationProps.state ? `, ${locationProps.state}` : ""}`
@@ -128,8 +229,61 @@ export const parseWeatherGovForecast = (pointsPayload, forecastPayload) => {
       min,
       max
     },
-    forecast: dailyForecast.slice(0, 7).map(({ _pickedDaytime, ...rest }) => rest)
+    forecast: dailyForecast
+      .slice(0, 7)
+      .map(({ _pickedDaytime, ...rest }) => rest)
   };
+};
+
+const parseWeatherGovObservation = (observationPayload, units) => {
+  const props = observationPayload?.properties;
+  if (!props) {
+    return null;
+  }
+  let isDaytime = null;
+  if (props.icon?.includes("/day/")) {
+    isDaytime = true;
+  } else if (props.icon?.includes("/night/")) {
+    isDaytime = false;
+  }
+  const temp = convertTemperature(props.temperature, units);
+  const dewpoint = toDewpoint({
+    value: convertTemperature(props.dewpoint, units),
+    unitCode: units === "metric" ? "wmoUnit:degC" : "wmoUnit:degF"
+  });
+  const pressureSource = props.seaLevelPressure || props.barometricPressure;
+  const pressure = convertPressure(pressureSource, units);
+  const windChill = convertTemperature(props.windChill, units);
+  const heatIndex = convertTemperature(props.heatIndex, units);
+  return {
+    temp,
+    description: props.textDescription || "",
+    icon: props.icon || "",
+    time: props.timestamp || null,
+    windSpeed: formatWindSpeed(props.windSpeed, units),
+    windGust: formatWindSpeed(props.windGust, units),
+    windDirection: windDirectionToCardinal(props.windDirection?.value),
+    windDirectionDegrees: props.windDirection?.value ?? null,
+    relativeHumidity: toPercent(props.relativeHumidity),
+    dewpoint,
+    pressure,
+    windChill,
+    heatIndex,
+    isDaytime
+  };
+};
+
+const mergeCurrentWeather = (forecastCurrent, observationCurrent) => {
+  if (!observationCurrent) {
+    return forecastCurrent;
+  }
+  const merged = { ...forecastCurrent };
+  Object.entries(observationCurrent).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      merged[key] = value;
+    }
+  });
+  return merged;
 };
 
 const fetchWeatherGov = async (config) => {
@@ -155,7 +309,37 @@ const fetchWeatherGov = async (config) => {
     throw error;
   }
   const forecastPayload = await forecastRes.json();
-  return parseWeatherGovForecast(pointsPayload, forecastPayload);
+  const forecastData = parseWeatherGovForecast(pointsPayload, forecastPayload);
+  const stationsUrl = pointsPayload?.properties?.observationStations;
+  let observationCurrent = null;
+  if (stationsUrl) {
+    try {
+      const stationsRes = await fetch(stationsUrl, { headers });
+      if (stationsRes.ok) {
+        const stationsPayload = await stationsRes.json();
+        const station =
+          stationsPayload?.features?.[0]?.properties?.stationIdentifier ||
+          stationsPayload?.features?.[0]?.properties?.stationId;
+        if (station) {
+          const obsUrl = `https://api.weather.gov/stations/${station}/observations/latest`;
+          const obsRes = await fetch(obsUrl, { headers });
+          if (obsRes.ok) {
+            const observationPayload = await obsRes.json();
+            observationCurrent = parseWeatherGovObservation(
+              observationPayload,
+              forecastData.units
+            );
+          }
+        }
+      }
+    } catch (_error) {
+      observationCurrent = null;
+    }
+  }
+  return {
+    ...forecastData,
+    current: mergeCurrentWeather(forecastData.current, observationCurrent)
+  };
 };
 
 export const fetchWeather = async (config) => {

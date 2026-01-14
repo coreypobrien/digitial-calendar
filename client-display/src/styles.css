@@ -153,13 +153,45 @@ body {
   min-width: 0;
 }
 
+.display__weather-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .display__weather strong {
   font-size: 26px;
+}
+
+.display__weather-wind {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.display__weather-wind-arrow {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  transform: rotate(var(--wind-deg));
+}
+
+.display__weather-wind-arrow svg {
+  width: 100%;
+  height: 100%;
 }
 
 .display__weather span {
   color: var(--muted);
   font-size: 14px;
+}
+
+.display__weather-meta {
+  font-size: 12px;
 }
 
 .display__forecast {
