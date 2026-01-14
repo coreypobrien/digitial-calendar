@@ -803,27 +803,83 @@ export default function App() {
     return `${Math.round(dewpoint.value)}°${unit}`;
   };
 
-  const formatWind = (speed, direction) => {
-    if (!speed && !direction) {
+  const formatWind = (speed, direction, degrees, gust, includeDegrees = false) => {
+    if (!speed && !direction && !gust) {
       return "";
     }
+    const degreeLabel =
+      includeDegrees && typeof degrees === "number" ? ` (${Math.round(degrees)}°)` : "";
+    const gustLabel = gust ? ` gust ${gust}` : "";
     if (speed && direction) {
-      return `${direction} ${speed}`;
+      return `${direction}${degreeLabel} ${speed}${gustLabel}`;
     }
-    return speed || direction;
+    if (speed) {
+      return `${speed}${gustLabel}`;
+    }
+    if (direction) {
+      return `${direction}${degreeLabel}${gustLabel}`;
+    }
+    return gustLabel.trim();
+  };
+
+  const formatWindSpeedOnly = (speed, gust) => {
+    if (!speed && !gust) {
+      return "";
+    }
+    const gustLabel = gust ? ` gust ${gust}` : "";
+    if (speed) {
+      return `${speed}${gustLabel}`;
+    }
+    return gustLabel.trim();
   };
 
   const formatTemp = (value) =>
     value !== undefined && value !== null ? `${Math.round(value)}°${weatherUnits}` : "";
 
+  const formatNonZeroTemp = (value) =>
+    typeof value === "number" && value !== 0 ? `${Math.round(value)}°${weatherUnits}` : "";
+
+  const formatPressure = (pressure) => {
+    if (!pressure || typeof pressure.value !== "number") {
+      return "";
+    }
+    if (pressure.unit === "inHg") {
+      return `${pressure.value.toFixed(2)} ${pressure.unit}`;
+    }
+    if (pressure.unit) {
+      return `${Math.round(pressure.value)} ${pressure.unit}`;
+    }
+    return `${Math.round(pressure.value)}`;
+  };
+
   const weatherHighLow =
     weatherToday?.min !== undefined && weatherToday?.max !== undefined
       ? `${formatTemp(weatherToday.max)} / ${formatTemp(weatherToday.min)}`
       : "";
+  const weatherWind = formatWindSpeedOnly(weatherCurrent.windSpeed, weatherCurrent.windGust);
+  const weatherWindWithDegrees = formatWind(
+    weatherCurrent.windSpeed,
+    weatherCurrent.windDirection,
+    weatherCurrent.windDirectionDegrees,
+    weatherCurrent.windGust,
+    true
+  );
+  const weatherWindDegrees =
+    typeof weatherCurrent.windDirectionDegrees === "number"
+      ? Math.round(weatherCurrent.windDirectionDegrees)
+      : null;
+  const weatherWindArrowDegrees =
+    weatherWindDegrees !== null ? (weatherWindDegrees + 180) % 360 : null;
+  const weatherPressure = formatPressure(weatherCurrent.pressure);
+  const weatherWindChill = formatNonZeroTemp(weatherCurrent.windChill);
+  const weatherHeatIndex = formatNonZeroTemp(weatherCurrent.heatIndex);
 
   const weatherMetrics = [
     { label: "High/Low", value: weatherHighLow },
-    { label: "Wind", value: formatWind(weatherCurrent.windSpeed, weatherCurrent.windDirection) },
+    { label: "Wind", value: weatherWindWithDegrees },
+    { label: "Pressure", value: weatherPressure },
+    { label: "Wind chill", value: weatherWindChill },
+    { label: "Heat index", value: weatherHeatIndex },
     { label: "Humidity", value: formatPercent(weatherCurrent.relativeHumidity) },
     {
       label: "Precip",
@@ -841,6 +897,13 @@ export default function App() {
     },
     { label: "Observed", value: weatherObservedAt }
   ].filter((item) => item.value);
+  const weatherExtras = [
+    weatherPressure ? `Pressure ${weatherPressure}` : "",
+    weatherWindChill ? `Wind chill ${weatherWindChill}` : "",
+    weatherHeatIndex ? `Heat index ${weatherHeatIndex}` : ""
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const viewportWidth = viewportSize.width;
   const isCompactHeader = viewportWidth <= 1200;
   const isNarrowPortrait =
@@ -1705,8 +1768,32 @@ export default function App() {
             <div className="display__weather-details">
               {weatherSummary ? (
                 <>
-                  <strong>{weatherSummary}</strong>
+                  <div className="display__weather-summary">
+                    <strong>{weatherSummary}</strong>
+                    {weatherWind ? (
+                      <span className="display__weather-wind">
+                        {weatherWindArrowDegrees !== null ? (
+                          <span
+                            className="display__weather-wind-arrow"
+                            style={{ "--wind-deg": `${weatherWindArrowDegrees}deg` }}
+                            aria-hidden="true"
+                          >
+                            <svg viewBox="0 0 24 24" focusable="false">
+                              <path
+                                d="M12 2l9 20-9-4-9 4L12 2z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          </span>
+                        ) : null}
+                        {weatherWind}
+                      </span>
+                    ) : null}
+                  </div>
                   <span>{weatherDescription}</span>
+                  {weatherExtras ? (
+                    <span className="display__weather-meta">{weatherExtras}</span>
+                  ) : null}
                 </>
               ) : (
                 <span>{weatherError || `${weatherLocationName} · ${weatherUnits}`}</span>
