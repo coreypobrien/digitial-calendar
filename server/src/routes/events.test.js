@@ -48,6 +48,30 @@ describe("events route", () => {
     expect(config.google.syncDays).toBe(res.body.syncDays);
   });
 
+  it("backfills events when timeMin is earlier than the cached range", async () => {
+    const { saveEventCache } = await import("../storage/eventStore.js");
+    const base = new Date(2025, 0, 15, 12, 0, 0);
+    const cachedMin = base.toISOString();
+    const cachedMax = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await saveEventCache({
+      updatedAt: new Date().toISOString(),
+      range: { timeMin: cachedMin, timeMax: cachedMax },
+      events: []
+    });
+
+    const target = new Date(2025, 0, 1, 0, 0, 0).toISOString();
+    const { syncCalendarEvents } = await import("../services/calendarSync.js");
+    syncCalendarEvents.mockClear();
+
+    const res = await supertest(app).post("/api/events/extend").send({ timeMin: target });
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(true);
+    expect(syncCalendarEvents).toHaveBeenCalledWith({
+      timeMin: target,
+      timeMax: cachedMax
+    });
+  });
+
   it("returns a config error when no sources are configured", async () => {
     const { syncCalendarEvents } = await import("../services/calendarSync.js");
     syncCalendarEvents.mockImplementationOnce(async () => {

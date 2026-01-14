@@ -3,13 +3,17 @@ import { saveEventCache } from "../storage/eventStore.js";
 import { normalizeIcalFeeds, syncIcalEvents } from "./icalCalendar.js";
 import { syncGoogleEvents } from "./googleCalendar.js";
 
-export const syncCalendarEvents = async ({ requireGoogle = false } = {}) => {
+export const syncCalendarEvents = async ({
+  requireGoogle = false,
+  timeMin: overrideMin,
+  timeMax: overrideMax
+} = {}) => {
   const { config } = await loadConfig();
   const now = new Date();
-  const timeMin = now.toISOString();
-  const timeMax = new Date(
-    now.getTime() + config.google.syncDays * 24 * 60 * 60 * 1000
-  ).toISOString();
+  const timeMin = overrideMin ?? now.toISOString();
+  const timeMax =
+    overrideMax ??
+    new Date(now.getTime() + config.google.syncDays * 24 * 60 * 60 * 1000).toISOString();
   const iCalFeeds = normalizeIcalFeeds(config.ical?.feeds);
 
   let googleSummary = { connected: false, calendars: 0, events: [] };

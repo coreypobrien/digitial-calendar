@@ -12,7 +12,13 @@ export const defaultConfig = {
       accent: "#2b6f6b",
       text: "#1f1f1f"
     },
-    mergeCalendars: true
+    mergeCalendars: true,
+    backfillPast: {
+      month: true,
+      fourWeek: true,
+      week: true
+    },
+    backfillPastDebounceSeconds: 60
   },
   refresh: {
     calendarSyncMinutes: 10,

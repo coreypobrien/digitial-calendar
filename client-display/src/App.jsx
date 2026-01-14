@@ -447,6 +447,7 @@ export default function App() {
   const resetTimerRef = useRef(null);
   const lastDayKeyRef = useRef(toLocalDateKey(new Date()));
   const dayChangeTimerRef = useRef(null);
+  const lastBackfillRef = useRef({ key: null, at: 0 });
   const debugEvents = useMemo(() => {
     if (typeof window === "undefined") {
       return false;
@@ -763,6 +764,8 @@ export default function App() {
 
   const timeFormat = config?.display?.timeFormat || "12h";
   const mergeCalendars = config?.display?.mergeCalendars ?? true;
+  const backfillPast = config?.display?.backfillPast || {};
+  const backfillDebounceSeconds = config?.display?.backfillPastDebounceSeconds ?? 60;
   const defaultView = viewLabels[config?.display?.defaultView]
     ? config.display.defaultView
     : "month";
@@ -1183,6 +1186,75 @@ export default function App() {
     view,
     weekEndDate,
     fourWeekEndDate
+  ]);
+
+  useEffect(() => {
+    if (view !== "month" && view !== "week" && view !== "fourWeek") {
+      return;
+    }
+    const shouldBackfill =
+      view === "month"
+        ? backfillPast.month
+        : view === "week"
+          ? backfillPast.week
+          : backfillPast.fourWeek;
+    if (!shouldBackfill) {
+      return;
+    }
+    const rangeMin = eventsCache?.range?.timeMin;
+    if (!rangeMin) {
+      return;
+    }
+    const rangeStart = new Date(rangeMin);
+    if (Number.isNaN(rangeStart.getTime())) {
+      return;
+    }
+    const targetStart =
+      view === "month"
+        ? new Date(activeMonthDate.getFullYear(), activeMonthDate.getMonth(), 1)
+        : new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate());
+    if (targetStart >= rangeStart) {
+      return;
+    }
+    const targetIso = targetStart.toISOString();
+    const requestKey = `${targetIso}|${rangeMin}`;
+    const nowMs = Date.now();
+    if (
+      lastBackfillRef.current.key === requestKey &&
+      nowMs - lastBackfillRef.current.at < backfillDebounceSeconds * 1000
+    ) {
+      return;
+    }
+    lastBackfillRef.current = { key: requestKey, at: nowMs };
+    const extend = async () => {
+      try {
+        const response = await fetch("/api/events/extend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ timeMin: targetIso })
+        });
+        if (!response.ok) {
+          return;
+        }
+        const eventsResponse = await fetch("/api/events");
+        const data = await eventsResponse.json();
+        if (eventsResponse.ok) {
+          setEventsCache(data);
+        }
+      } catch (_error) {
+        // Ignore extension failures; auto-sync will still refresh.
+      }
+    };
+    extend();
+  }, [
+    activeMonthDate,
+    backfillPast.fourWeek,
+    backfillPast.month,
+    backfillPast.week,
+    backfillDebounceSeconds,
+    eventsCache?.range?.timeMin,
+    view,
+    weekStartDate
   ]);
 
   const upcomingEvents = useMemo(() => {

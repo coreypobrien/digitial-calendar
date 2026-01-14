@@ -17,51 +17,84 @@ router.get("/", async (_req, res, next) => {
 
 router.post("/extend", async (req, res, next) => {
   try {
-    const { timeMax } = req.body || {};
-    if (!timeMax) {
-      res.status(400).json({ error: "timeMax is required" });
+    const { timeMin, timeMax } = req.body || {};
+    if (!timeMin && !timeMax) {
+      res.status(400).json({ error: "timeMin or timeMax is required" });
       return;
     }
-    const target = new Date(timeMax);
-    if (Number.isNaN(target.getTime())) {
+    const minTarget = timeMin ? new Date(timeMin) : null;
+    const maxTarget = timeMax ? new Date(timeMax) : null;
+    if (minTarget && Number.isNaN(minTarget.getTime())) {
+      res.status(400).json({ error: "timeMin must be a valid ISO date" });
+      return;
+    }
+    if (maxTarget && Number.isNaN(maxTarget.getTime())) {
       res.status(400).json({ error: "timeMax must be a valid ISO date" });
       return;
     }
+
     const cache = await loadEventCache();
+    const cachedMin = cache?.range?.timeMin ? new Date(cache.range.timeMin) : null;
     const cachedMax = cache?.range?.timeMax ? new Date(cache.range.timeMax) : null;
-    if (cachedMax && !Number.isNaN(cachedMax.getTime()) && target <= cachedMax) {
-      const { config } = await loadConfig();
-      res.json({ updated: false, syncDays: config.google.syncDays });
-      return;
-    }
     const now = new Date();
-    if (target <= now) {
-      const { config } = await loadConfig();
-      res.json({ updated: false, syncDays: config.google.syncDays });
-      return;
-    }
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const requiredDays = Math.ceil((target.getTime() - now.getTime()) / msPerDay);
     const { config } = await loadConfig();
     const currentDays = config.google.syncDays;
-    const nextDays = Math.min(Math.max(currentDays, requiredDays), 365);
-    if (nextDays === currentDays) {
+    let nextConfig = config;
+
+    let desiredMin = null;
+    let desiredMax = null;
+    if (
+      maxTarget &&
+      maxTarget > now &&
+      (!cachedMax || Number.isNaN(cachedMax.getTime()) || maxTarget > cachedMax)
+    ) {
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const requiredDays = Math.ceil((maxTarget.getTime() - now.getTime()) / msPerDay);
+      const nextDays = Math.min(Math.max(currentDays, requiredDays), 365);
+      if (nextDays !== currentDays) {
+        nextConfig = await saveConfig({
+          ...config,
+          google: { ...config.google, syncDays: nextDays }
+        });
+      }
+      desiredMax = maxTarget;
+    }
+
+    if (
+      minTarget &&
+      (!cachedMin || Number.isNaN(cachedMin.getTime()) || minTarget < cachedMin)
+    ) {
+      desiredMin = minTarget;
+    }
+
+    if (!desiredMin && !desiredMax) {
       res.json({ updated: false, syncDays: currentDays });
       return;
     }
-    const saved = await saveConfig({
-      ...config,
-      google: { ...config.google, syncDays: nextDays }
-    });
+
+    if (!desiredMin) {
+      desiredMin =
+        cachedMin && !Number.isNaN(cachedMin.getTime()) ? cachedMin : new Date(now);
+    }
+    if (!desiredMax) {
+      desiredMax =
+        cachedMax && !Number.isNaN(cachedMax.getTime())
+          ? cachedMax
+          : new Date(now.getTime() + currentDays * 24 * 60 * 60 * 1000);
+    }
+
     try {
-      const summary = await syncCalendarEvents();
-      res.json({ updated: true, syncDays: saved.google.syncDays, summary });
+      const summary = await syncCalendarEvents({
+        timeMin: desiredMin.toISOString(),
+        timeMax: desiredMax.toISOString()
+      });
+      res.json({ updated: true, syncDays: nextConfig.google.syncDays, summary });
     } catch (error) {
       if (error?.code === "NOT_CONNECTED") {
         res.status(409).json({
           error: "Google account not connected",
           updated: true,
-          syncDays: saved.google.syncDays
+          syncDays: nextConfig.google.syncDays
         });
         return;
       }
@@ -69,7 +102,7 @@ router.post("/extend", async (req, res, next) => {
         res.status(409).json({
           error: "No calendar sources configured",
           updated: true,
-          syncDays: saved.google.syncDays
+          syncDays: nextConfig.google.syncDays
         });
         return;
       }

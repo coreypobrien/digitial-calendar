@@ -30,7 +30,13 @@ export const ConfigSchema = z.object({
     defaultView: z.enum(["month", "fourWeek", "week", "activity", "chores"]),
     timeFormat: z.enum(["12h", "24h"]),
     theme: ThemeSchema,
-    mergeCalendars: z.boolean()
+    mergeCalendars: z.boolean(),
+    backfillPast: z.object({
+      month: z.boolean(),
+      fourWeek: z.boolean(),
+      week: z.boolean()
+    }),
+    backfillPastDebounceSeconds: z.number().int().min(5).max(3600)
   }),
   refresh: z.object({
     calendarSyncMinutes: z.number().int().min(1),

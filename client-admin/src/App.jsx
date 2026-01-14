@@ -661,6 +661,84 @@ export default function App() {
                         Combine matching events across calendars
                       </label>
                     </div>
+                    <div className="admin__field">
+                      Backfill past events
+                      <label className="admin__checkbox">
+                        <input
+                          type="checkbox"
+                          checked={config.display.backfillPast?.month ?? false}
+                          onChange={(event) =>
+                            updateConfig((prev) => ({
+                              ...prev,
+                              display: {
+                                ...prev.display,
+                                backfillPast: {
+                                  ...prev.display.backfillPast,
+                                  month: event.target.checked
+                                }
+                              }
+                            }))
+                          }
+                        />
+                        Month view
+                      </label>
+                      <label className="admin__checkbox">
+                        <input
+                          type="checkbox"
+                          checked={config.display.backfillPast?.fourWeek ?? false}
+                          onChange={(event) =>
+                            updateConfig((prev) => ({
+                              ...prev,
+                              display: {
+                                ...prev.display,
+                                backfillPast: {
+                                  ...prev.display.backfillPast,
+                                  fourWeek: event.target.checked
+                                }
+                              }
+                            }))
+                          }
+                        />
+                        4-week view
+                      </label>
+                      <label className="admin__checkbox">
+                        <input
+                          type="checkbox"
+                          checked={config.display.backfillPast?.week ?? false}
+                          onChange={(event) =>
+                            updateConfig((prev) => ({
+                              ...prev,
+                              display: {
+                                ...prev.display,
+                                backfillPast: {
+                                  ...prev.display.backfillPast,
+                                  week: event.target.checked
+                                }
+                              }
+                            }))
+                          }
+                        />
+                        Week view
+                      </label>
+                    </div>
+                    <label className="admin__field">
+                      Backfill debounce (seconds)
+                      <input
+                        type="number"
+                        min="5"
+                        max="3600"
+                        value={config.display.backfillPastDebounceSeconds ?? 60}
+                        onChange={(event) =>
+                          updateConfig((prev) => ({
+                            ...prev,
+                            display: {
+                              ...prev.display,
+                              backfillPastDebounceSeconds: Number(event.target.value)
+                            }
+                          }))
+                        }
+                      />
+                    </label>
                     <label className="admin__field">
                       Background color
                       <input
